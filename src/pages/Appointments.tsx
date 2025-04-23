@@ -1,26 +1,47 @@
 import React, { useState, useEffect } from 'react';
-import { format } from 'date-fns';
+import { format, startOfWeek, endOfWeek, startOfDay, endOfDay, subWeeks } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
-import { Plus, Search, Filter } from 'lucide-react';
-import { Appointment, Cleaner } from '../types';
+import { Plus, Search, Filter, MapPin, Clock, User, Calendar } from 'lucide-react';
+import { MapContainer, TileLayer, Marker, Popup } from 'react-leaflet';
+import { Icon } from 'leaflet';
+import 'leaflet/dist/leaflet.css';
+import { Appointment, Cleaner, Client } from '../types';
 import AppointmentModal from '../components/AppointmentModal';
 import { supabase } from '../lib/supabase';
+
+const DEFAULT_CENTER = {
+  lat: -23.5505,
+  lng: -46.6333,
+};
+
+const customIcon = new Icon({
+  iconUrl: 'https://unpkg.com/leaflet@1.7.1/dist/images/marker-icon.png',
+  iconSize: [25, 41],
+  iconAnchor: [12, 41],
+});
 
 const Appointments: React.FC = () => {
   const [appointments, setAppointments] = useState<Appointment[]>([]);
   const [cleaners, setCleaners] = useState<Cleaner[]>([]);
+  const [clients, setClients] = useState<Client[]>([]);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [selectedAppointment, setSelectedAppointment] = useState<Appointment | undefined>();
   const [filters, setFilters] = useState({
     dateRange: 'all',
     cleanerId: '',
     status: 'all',
+    clientId: '',
+    searchTerm: '',
+    customDateStart: '',
+    customDateEnd: '',
   });
   const [loading, setLoading] = useState(true);
+  const [isDetailsModalOpen, setIsDetailsModalOpen] = useState(false);
 
   useEffect(() => {
     fetchAppointments();
     fetchCleaners();
+    fetchClients();
   }, [filters]);
 
   const fetchAppointments = async () => {
@@ -28,40 +49,67 @@ const Appointments: React.FC = () => {
       setLoading(true);
       let query = supabase
         .from('appointments')
-        .select('*');
+        .select(`
+          *,
+          cleaners (
+            name,
+            email,
+            personal_phone,
+            company_phone
+          )
+        `);
 
-      // Apply filters
       if (filters.dateRange !== 'all') {
-        const today = new Date();
-        const startDate = new Date();
-        const endDate = new Date();
+        let startDate: Date;
+        let endDate: Date;
 
         switch (filters.dateRange) {
           case 'today':
-            startDate.setHours(0, 0, 0, 0);
-            endDate.setHours(23, 59, 59, 999);
+            startDate = startOfDay(new Date());
+            endDate = endOfDay(new Date());
             break;
           case 'week':
-            startDate.setDate(today.getDate() - today.getDay());
-            endDate.setDate(startDate.getDate() + 6);
+            startDate = startOfWeek(new Date(), { weekStartsOn: 0 });
+            endDate = endOfWeek(new Date(), { weekStartsOn: 0 });
             break;
           case 'lastWeek':
-            startDate.setDate(today.getDate() - today.getDay() - 7);
-            endDate.setDate(startDate.getDate() + 6);
+            startDate = startOfWeek(subWeeks(new Date(), 1), { weekStartsOn: 0 });
+            endDate = endOfWeek(subWeeks(new Date(), 1), { weekStartsOn: 0 });
+            break;
+          case 'custom':
+            if (filters.customDateStart && filters.customDateEnd) {
+              startDate = new Date(filters.customDateStart);
+              endDate = new Date(filters.customDateEnd);
+            }
+            break;
+          default:
             break;
         }
 
-        query = query
-          .gte('scheduled_at', startDate.toISOString())
-          .lte('scheduled_at', endDate.toISOString());
+        if (startDate && endDate) {
+          query = query
+            .gte('scheduled_at', startDate.toISOString())
+            .lte('scheduled_at', endDate.toISOString());
+        }
       }
 
       if (filters.cleanerId) {
         query = query.eq('cleaner_id', filters.cleanerId);
       }
 
+      if (filters.clientId) {
+        query = query.eq('client_name', filters.clientId);
+      }
+
       if (filters.status !== 'all') {
         query = query.eq('status', filters.status);
+      }
+
+      if (filters.searchTerm) {
+        query = query.or(`
+          client_name.ilike.%${filters.searchTerm}%,
+          address.ilike.%${filters.searchTerm}%
+        `);
       }
 
       const { data, error } = await query.order('scheduled_at', { ascending: true });
@@ -86,6 +134,20 @@ const Appointments: React.FC = () => {
       setCleaners(data || []);
     } catch (error) {
       console.error('Error fetching cleaners:', error);
+    }
+  };
+
+  const fetchClients = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('clients')
+        .select('*')
+        .order('name');
+
+      if (error) throw error;
+      setClients(data || []);
+    } catch (error) {
+      console.error('Error fetching clients:', error);
     }
   };
 
@@ -115,7 +177,7 @@ const Appointments: React.FC = () => {
   };
 
   const handleDeleteAppointment = async (id: string) => {
-    if (!window.confirm('Are you sure you want to delete this appointment?')) return;
+    if (!window.confirm('Tem certeza que deseja excluir este agendamento?')) return;
 
     try {
       const { error } = await supabase
@@ -146,11 +208,11 @@ const Appointments: React.FC = () => {
   const getStatusText = (status: string) => {
     switch (status) {
       case 'scheduled':
-        return 'Scheduled';
+        return 'Agendado';
       case 'in_progress':
-        return 'In Progress';
+        return 'Em Andamento';
       case 'completed':
-        return 'Completed';
+        return 'Concluído';
       default:
         return status;
     }
@@ -170,9 +232,9 @@ const Appointments: React.FC = () => {
       </div>
 
       <div className="bg-white rounded-lg shadow overflow-hidden">
-        <div className="p-4 border-b">
+        <div className="p-4 border-b space-y-4">
           <div className="flex flex-wrap gap-4">
-            <div>
+            <div className="flex-1 min-w-[200px]">
               <label className="block text-sm font-medium text-gray-700 mb-1">
                 Período
               </label>
@@ -187,10 +249,42 @@ const Appointments: React.FC = () => {
                 <option value="today">Hoje</option>
                 <option value="week">Esta Semana</option>
                 <option value="lastWeek">Semana Passada</option>
+                <option value="custom">Personalizado</option>
               </select>
             </div>
 
-            <div>
+            {filters.dateRange === 'custom' && (
+              <div className="flex gap-2 flex-1 min-w-[300px]">
+                <div className="flex-1">
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Data Inicial
+                  </label>
+                  <input
+                    type="date"
+                    value={filters.customDateStart}
+                    onChange={(e) =>
+                      setFilters({ ...filters, customDateStart: e.target.value })
+                    }
+                    className="block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm"
+                  />
+                </div>
+                <div className="flex-1">
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Data Final
+                  </label>
+                  <input
+                    type="date"
+                    value={filters.customDateEnd}
+                    onChange={(e) =>
+                      setFilters({ ...filters, customDateEnd: e.target.value })
+                    }
+                    className="block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm"
+                  />
+                </div>
+              </div>
+            )}
+
+            <div className="flex-1 min-w-[200px]">
               <label className="block text-sm font-medium text-gray-700 mb-1">
                 Limpador
               </label>
@@ -210,7 +304,27 @@ const Appointments: React.FC = () => {
               </select>
             </div>
 
-            <div>
+            <div className="flex-1 min-w-[200px]">
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                Cliente
+              </label>
+              <select
+                value={filters.clientId}
+                onChange={(e) =>
+                  setFilters({ ...filters, clientId: e.target.value })
+                }
+                className="block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm"
+              >
+                <option value="">Todos os Clientes</option>
+                {clients.map((client) => (
+                  <option key={client.id} value={client.name}>
+                    {client.name}
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            <div className="flex-1 min-w-[200px]">
               <label className="block text-sm font-medium text-gray-700 mb-1">
                 Status
               </label>
@@ -228,93 +342,128 @@ const Appointments: React.FC = () => {
               </select>
             </div>
           </div>
+
+          <div className="relative">
+            <input
+              type="text"
+              value={filters.searchTerm}
+              onChange={(e) =>
+                setFilters({ ...filters, searchTerm: e.target.value })
+              }
+              placeholder="Buscar por cliente ou endereço..."
+              className="block w-full rounded-md border-gray-300 pl-10 pr-3 py-2 text-sm placeholder-gray-400 focus:outline-none focus:ring-1 focus:ring-blue-500 focus:border-blue-500"
+            />
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-gray-400" />
+          </div>
         </div>
 
-        <table className="min-w-full divide-y divide-gray-200">
-          <thead className="bg-gray-50">
-            <tr>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                Cliente
-              </th>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                Limpador
-              </th>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                Data e Hora
-              </th>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                Endereço
-              </th>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                Status
-              </th>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                Ações
-              </th>
-            </tr>
-          </thead>
+        <div className="overflow-x-auto">
+          <table className="min-w-full divide-y divide-gray-200">
+            <thead className="bg-gray-50">
+              <tr>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  Cliente
+                </th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  Limpador
+                </th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  Data e Hora
+                </th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  Endereço
+                </th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  Status
+                </th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  Ações
+                </th>
+              </tr>
+            </thead>
 
-          <tbody className="bg-white divide-y divide-gray-200">
-            {loading ? (
-              <tr>
-                <td colSpan={6} className="px-6 py-4 text-center">
-                  Loading...
-                </td>
-              </tr>
-            ) : appointments.length === 0 ? (
-              <tr>
-                <td colSpan={6} className="px-6 py-4 text-center">
-                  No appointments found
-                </td>
-              </tr>
-            ) : (
-              appointments.map((appointment) => (
-                <tr key={appointment.id}>
-                  <td className="px-6 py-4 whitespace-nowrap">
-                    {appointment.client_name}
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap">
-                    {cleaners.find(c => c.id === appointment.cleaner_id)?.name}
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap">
-                    {format(new Date(appointment.scheduled_at), "dd/MM/yyyy 'at' HH:mm", {
-                      locale: ptBR,
-                    })}
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap">
-                    {appointment.address}
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap">
-                    <span
-                      className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${getStatusColor(
-                        appointment.status
-                      )}`}
-                    >
-                      {getStatusText(appointment.status)}
-                    </span>
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
-                    <button
-                      onClick={() => {
-                        setSelectedAppointment(appointment);
-                        setIsModalOpen(true);
-                      }}
-                      className="text-blue-600 hover:text-blue-900 mr-4"
-                    >
-                      Editar
-                    </button>
-                    <button
-                      onClick={() => handleDeleteAppointment(appointment.id)}
-                      className="text-red-600 hover:text-red-900"
-                    >
-                      Excluir
-                    </button>
+            <tbody className="bg-white divide-y divide-gray-200">
+              {loading ? (
+                <tr>
+                  <td colSpan={6} className="px-6 py-4 text-center">
+                    <div className="flex items-center justify-center">
+                      <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-blue-600"></div>
+                      <span className="ml-2">Carregando...</span>
+                    </div>
                   </td>
                 </tr>
-              ))
-            )}
-          </tbody>
-        </table>
+              ) : appointments.length === 0 ? (
+                <tr>
+                  <td colSpan={6} className="px-6 py-4 text-center text-gray-500">
+                    Nenhum agendamento encontrado
+                  </td>
+                </tr>
+              ) : (
+                appointments.map((appointment) => (
+                  <tr 
+                    key={appointment.id}
+                    className="hover:bg-gray-50 cursor-pointer"
+                    onClick={() => {
+                      setSelectedAppointment(appointment);
+                      setIsDetailsModalOpen(true);
+                    }}
+                  >
+                    <td className="px-6 py-4 whitespace-nowrap">
+                      <div className="text-sm font-medium text-gray-900">
+                        {appointment.client_name}
+                      </div>
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap">
+                      <div className="text-sm text-gray-900">
+                        {cleaners.find(c => c.id === appointment.cleaner_id)?.name}
+                      </div>
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap">
+                      {format(new Date(appointment.scheduled_at), "dd/MM/yyyy 'às' HH:mm", {
+                        locale: ptBR,
+                      })}
+                    </td>
+                    <td className="px-6 py-4">
+                      <div className="text-sm text-gray-900 line-clamp-2">
+                        {appointment.address}
+                      </div>
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap">
+                      <span
+                        className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${getStatusColor(
+                          appointment.status
+                        )}`}
+                      >
+                        {getStatusText(appointment.status)}
+                      </span>
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setSelectedAppointment(appointment);
+                          setIsModalOpen(true);
+                        }}
+                        className="text-blue-600 hover:text-blue-900 mr-4"
+                      >
+                        Editar
+                      </button>
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleDeleteAppointment(appointment.id);
+                        }}
+                        className="text-red-600 hover:text-red-900"
+                      >
+                        Excluir
+                      </button>
+                    </td>
+                  </tr>
+                ))
+              )}
+            </tbody>
+          </table>
+        </div>
       </div>
 
       <AppointmentModal
@@ -327,6 +476,143 @@ const Appointments: React.FC = () => {
         cleaners={cleaners}
         onSave={handleSaveAppointment}
       />
+
+      {/* Appointment Details Modal */}
+      {isDetailsModalOpen && selectedAppointment && (
+        <div className="fixed z-10 inset-0 overflow-y-auto">
+          <div className="flex items-end justify-center min-h-screen pt-4 px-4 pb-20 text-center sm:block sm:p-0">
+            <div
+              className="fixed inset-0 bg-gray-500 bg-opacity-75 transition-opacity"
+              onClick={() => setIsDetailsModalOpen(false)}
+            ></div>
+
+            <div className="inline-block align-bottom bg-white rounded-lg text-left overflow-hidden shadow-xl transform transition-all sm:my-8 sm:align-middle sm:max-w-lg sm:w-full">
+              <div className="bg-white px-4 pt-5 pb-4 sm:p-6 sm:pb-4">
+                <div className="sm:flex sm:items-start">
+                  <div className="mt-3 text-center sm:mt-0 sm:text-left w-full">
+                    <h3 className="text-lg leading-6 font-medium text-gray-900 mb-4">
+                      Detalhes do Agendamento
+                    </h3>
+                    
+                    {selectedAppointment?.latitude && selectedAppointment?.longitude && (
+                      <div className="h-64 rounded-lg overflow-hidden border border-gray-300 mb-4">
+                        <MapContainer
+                          center={{ lat: selectedAppointment.latitude, lng: selectedAppointment.longitude }}
+                          zoom={15}
+                          style={{ height: '100%', width: '100%' }}
+                        >
+                          <TileLayer
+                            url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
+                            attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
+                          />
+                          <Marker 
+                            position={{ lat: selectedAppointment.latitude, lng: selectedAppointment.longitude }}
+                            icon={customIcon}
+                          >
+                            <Popup>
+                              <div className="text-sm">
+                                <p className="font-medium">{selectedAppointment.client_name}</p>
+                                <p>{selectedAppointment.address}</p>
+                              </div>
+                            </Popup>
+                          </Marker>
+                        </MapContainer>
+                      </div>
+                    )}
+
+                    <div className="mt-4 space-y-4">
+                      <div className="flex items-center">
+                        <User className="h-5 w-5 text-gray-400 mr-2" />
+                        <div>
+                          <p className="text-sm font-medium text-gray-500">Cliente</p>
+                          <p className="text-sm text-gray-900">{selectedAppointment.client_name}</p>
+                        </div>
+                      </div>
+
+                      <div className="flex items-center">
+                        <Calendar className="h-5 w-5 text-gray-400 mr-2" />
+                        <div>
+                          <p className="text-sm font-medium text-gray-500">Data e Hora</p>
+                          <p className="text-sm text-gray-900">
+                            {format(new Date(selectedAppointment.scheduled_at), "PPp", {
+                              locale: ptBR,
+                            })}
+                          </p>
+                        </div>
+                      </div>
+
+                      <div className="flex items-start">
+                        <MapPin className="h-5 w-5 text-gray-400 mr-2 mt-0.5" />
+                        <div>
+                          <p className="text-sm font-medium text-gray-500">Endereço</p>
+                          <p className="text-sm text-gray-900">{selectedAppointment.address}</p>
+                        </div>
+                      </div>
+
+                      {selectedAppointment.started_at && (
+                        <div className="flex items-center">
+                          <Clock className="h-5 w-5 text-gray-400 mr-2" />
+                          <div>
+                            <p className="text-sm font-medium text-gray-500">Início do Serviço</p>
+                            <p className="text-sm text-gray-900">
+                              {format(new Date(selectedAppointment.started_at), "PPp", {
+                                locale: ptBR,
+                              })}
+                            </p>
+                          </div>
+                        </div>
+                      )}
+
+                      {selectedAppointment.completed_at && (
+                        <div className="flex items-center">
+                          <Clock className="h-5 w-5 text-gray-400 mr-2" />
+                          <div>
+                            <p className="text-sm font-medium text-gray-500">Conclusão</p>
+                            <p className="text-sm text-gray-900">
+                              {format(new Date(selectedAppointment.completed_at), "PPp", {
+                                locale: ptBR,
+                              })}
+                            </p>
+                          </div>
+                        </div>
+                      )}
+
+                      {selectedAppointment.description && (
+                        <div>
+                          <p className="text-sm font-medium text-gray-500">Descrição</p>
+                          <p className="text-sm text-gray-900 mt-1">
+                            {selectedAppointment.description}
+                          </p>
+                        </div>
+                      )}
+
+                      <div>
+                        <p className="text-sm font-medium text-gray-500">Status</p>
+                        <span
+                          className={`mt-1 px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${getStatusColor(
+                            selectedAppointment.status
+                          )}`}
+                        >
+                          {getStatusText(selectedAppointment.status)}
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+              <div className="bg-gray-50 px-4 py-3 sm:px-6 sm:flex sm:flex-row-reverse">
+                <button
+                  type="button"
+                  onClick={() => setIsDetailsModalOpen(false)}
+                  className="mt-3 w-full inline-flex justify-center rounded-md border border-gray-300 shadow-sm px-4 py-2 bg-white text-base font-medium text-gray-700 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 sm:mt-0 sm:ml-3 sm:w-auto sm:text-sm"
+                >
+                  Fechar
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

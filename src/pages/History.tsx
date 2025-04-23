@@ -2,13 +2,27 @@ import React from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { format, parseISO, differenceInMinutes } from 'date-fns';
 import { Dialog } from '@headlessui/react';
-import { Calendar, Users, X, Clock, MapPin } from 'lucide-react';
+import { Calendar, Users, X, Clock, MapPin, User, FileText } from 'lucide-react';
+import { MapContainer, TileLayer, Marker, Popup } from 'react-leaflet';
+import { Icon } from 'leaflet';
+import 'leaflet/dist/leaflet.css';
 import { supabase } from '../lib/supabase';
 import { Appointment, Cleaner, Client } from '../types';
 
 interface CompletedAppointment extends Appointment {
   cleaners: { name: string };
 }
+
+const DEFAULT_CENTER = {
+  lat: -23.5505,
+  lng: -46.6333,
+};
+
+const customIcon = new Icon({
+  iconUrl: 'https://unpkg.com/leaflet@1.7.1/dist/images/marker-icon.png',
+  iconSize: [25, 41],
+  iconAnchor: [12, 41],
+});
 
 const History = () => {
   const [isDetailsOpen, setIsDetailsOpen] = React.useState(false);
@@ -182,7 +196,7 @@ const History = () => {
                     {format(parseISO(appointment.completed_at!), 'PPp')}
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                    {duration} minutes
+                    {duration} minutos
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
                     {appointment.address}
@@ -202,73 +216,124 @@ const History = () => {
         </table>
       </div>
 
-      <Dialog open={isDetailsOpen} onClose={() => setIsDetailsOpen(false)} className="relative z-50">
-        <div className="fixed inset-0 bg-black/30" aria-hidden="true" />
-        <div className="fixed inset-0 flex items-center justify-center p-4">
-          <Dialog.Panel className="mx-auto max-w-2xl w-full bg-white rounded-xl shadow-lg">
-            {selectedAppointment && (
-              <>
-                <div className="flex justify-between items-center p-6 border-b">
-                  <Dialog.Title className="text-xl font-semibold">
-                    Detalhes do Agendamento
-                  </Dialog.Title>
-                  <button
-                    onClick={() => setIsDetailsOpen(false)}
-                    className="text-gray-400 hover:text-gray-500"
-                  >
-                    <X className="h-5 w-5" />
-                  </button>
-                </div>
+      {/* Appointment Details Modal */}
+      {isDetailsOpen && selectedAppointment && (
+        <Dialog open={isDetailsOpen} onClose={() => setIsDetailsOpen(false)} className="relative z-50">
+          <div className="fixed inset-0 bg-black/30" aria-hidden="true" />
+          <div className="fixed inset-0 flex items-center justify-center p-4">
+            <Dialog.Panel className="mx-auto max-w-2xl w-full bg-white rounded-xl shadow-lg">
+              <div className="flex justify-between items-center p-6 border-b">
+                <Dialog.Title className="text-xl font-semibold">
+                  Detalhes do Agendamento
+                </Dialog.Title>
+                <button
+                  onClick={() => setIsDetailsOpen(false)}
+                  className="text-gray-400 hover:text-gray-500"
+                >
+                  <X className="h-5 w-5" />
+                </button>
+              </div>
 
-                <div className="p-6 space-y-4">
-                  <div className="grid grid-cols-2 gap-4">
-                    <div>
-                      <h3 className="text-sm font-medium text-gray-500">Cliente</h3>
-                      <p className="mt-1 text-sm text-gray-900">{selectedAppointment.client_name}</p>
-                    </div>
-                    <div>
-                      <h3 className="text-sm font-medium text-gray-500">Limpador</h3>
-                      <p className="mt-1 text-sm text-gray-900">{selectedAppointment.cleaners.name}</p>
-                    </div>
-                    <div className="col-span-2">
-                      <h3 className="text-sm font-medium text-gray-500">Endereço</h3>
-                      <p className="mt-1 text-sm text-gray-900">{selectedAppointment.address}</p>
-                    </div>
-                    <div>
-                      <h3 className="text-sm font-medium text-gray-500">Início</h3>
-                      <p className="mt-1 text-sm text-gray-900">
-                        {selectedAppointment.started_at
-                          ? format(parseISO(selectedAppointment.started_at), 'PPp')
-                          : 'N/A'}
-                      </p>
-                    </div>
-                    <div>
-                      <h3 className="text-sm font-medium text-gray-500">Conclusão</h3>
-                      <p className="mt-1 text-sm text-gray-900">
-                        {format(parseISO(selectedAppointment.completed_at!), 'PPp')}
-                      </p>
-                    </div>
-                    {selectedAppointment.description && (
-                      <div className="col-span-2">
-                        <h3 className="text-sm font-medium text-gray-500">Descrição</h3>
-                        <p className="mt-1 text-sm text-gray-900">{selectedAppointment.description}</p>
-                      </div>
-                    )}
-                    {(selectedAppointment.latitude && selectedAppointment.longitude) && (
-                      <div className="col-span-2">
-                        <h3 className="text-sm font-medium text-gray-500">Localização</h3>
-                        <p className="mt-1 text-sm text-gray-900">
-                          {selectedAppointment.latitude}, {selectedAppointment.longitude}
-                        </p>
-                      </div>
-                    )}
+              <div className="p-6 space-y-6">
+                {/* Map */}
+                {selectedAppointment.latitude && selectedAppointment.longitude && (
+                  <div className="h-64 rounded-lg overflow-hidden border border-gray-300 mb-6">
+                    <MapContainer
+                      center={{ lat: selectedAppointment.latitude, lng: selectedAppointment.longitude }}
+                      zoom={15}
+                      style={{ height: '100%', width: '100%' }}
+                    >
+                      <TileLayer
+                        url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
+                        attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
+                      />
+                      <Marker 
+                        position={{ lat: selectedAppointment.latitude, lng: selectedAppointment.longitude }}
+                        icon={customIcon}
+                      >
+                        <Popup>
+                          <div className="text-sm">
+                            <p className="font-medium">{selectedAppointment.client_name}</p>
+                            <p>{selectedAppointment.address}</p>
+                          </div>
+                        </Popup>
+                      </Marker>
+                    </MapContainer>
                   </div>
+                )}
+
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="space-y-1">
+                    <div className="flex items-center text-gray-500">
+                      <User className="w-4 h-4 mr-2" />
+                      <span className="text-sm">Cliente</span>
+                    </div>
+                    <p className="text-sm font-medium">{selectedAppointment.client_name}</p>
+                  </div>
+
+                  <div className="space-y-1">
+                    <div className="flex items-center text-gray-500">
+                      <Users className="w-4 h-4 mr-2" />
+                      <span className="text-sm">Limpador</span>
+                    </div>
+                    <p className="text-sm font-medium">{selectedAppointment.cleaners.name}</p>
+                  </div>
+
+                  <div className="col-span-2 space-y-1">
+                    <div className="flex items-center text-gray-500">
+                      <MapPin className="w-4 h-4 mr-2" />
+                      <span className="text-sm">Endereço</span>
+                    </div>
+                    <p className="text-sm font-medium">{selectedAppointment.address}</p>
+                  </div>
+
+                  <div className="space-y-1">
+                    <div className="flex items-center text-gray-500">
+                      <Calendar className="w-4 h-4 mr-2" />
+                      <span className="text-sm">Início</span>
+                    </div>
+                    <p className="text-sm font-medium">
+                      {selectedAppointment.started_at
+                        ? format(parseISO(selectedAppointment.started_at), 'PPp')
+                        : 'N/A'}
+                    </p>
+                  </div>
+
+                  <div className="space-y-1">
+                    <div className="flex items-center text-gray-500">
+                      <Clock className="w-4 h-4 mr-2" />
+                      <span className="text-sm">Conclusão</span>
+                    </div>
+                    <p className="text-sm font-medium">
+                      {format(parseISO(selectedAppointment.completed_at!), 'PPp')}
+                    </p>
+                  </div>
+
+                  {selectedAppointment.description && (
+                    <div className="col-span-2 space-y-1">
+                      <div className="flex items-center text-gray-500">
+                        <FileText className="w-4 h-4 mr-2" />
+                        <span className="text-sm">Descrição</span>
+                      </div>
+                      <p className="text-sm font-medium">{selectedAppointment.description}</p>
+                    </div>
+                  )}
                 </div>
-              </>
-            )}
-          </Dialog.Panel>
-        </div>
-      </Dialog>
+              </div>
+
+              <div className="bg-gray-50 px-6 py-4 flex justify-end">
+                <button
+                  type="button"
+                  onClick={() => setIsDetailsOpen(false)}
+                  className="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md shadow-sm hover:bg-gray-50"
+                >
+                  Fechar
+                </button>
+              </div>
+            </Dialog.Panel>
+          </div>
+        </Dialog>
+      )}
     </div>
   );
 };

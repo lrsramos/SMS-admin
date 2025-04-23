@@ -36,6 +36,8 @@ interface ServiceLocationFormState {
   horario_preferido: string;
   observacoes: string;
   address_validated: boolean;
+  latitude: number | null;
+  longitude: number | null;
 }
 
 const defaultServiceLocation: ServiceLocationFormState = {
@@ -55,6 +57,8 @@ const defaultServiceLocation: ServiceLocationFormState = {
   horario_preferido: '',
   observacoes: '',
   address_validated: false,
+  latitude: null,
+  longitude: null,
 };
 
 const ClientModal: React.FC<ClientModalProps> = ({ isOpen, onClose, client, onSave }) => {
@@ -97,6 +101,8 @@ const ClientModal: React.FC<ClientModalProps> = ({ isOpen, onClose, client, onSa
           horario_preferido: location.horario_preferido || '',
           observacoes: location.observacoes || '',
           address_validated: true,
+          latitude: location.latitude,
+          longitude: location.longitude,
         });
       } else {
         setServiceLocation(defaultServiceLocation);
@@ -136,8 +142,8 @@ const ClientModal: React.FC<ClientModalProps> = ({ isOpen, onClose, client, onSa
       horario_preferido: serviceLocation.horario_preferido || null,
       observacoes: serviceLocation.observacoes || null,
       updated_at: new Date().toISOString(),
-      latitude: null,
-      longitude: null,
+      latitude: serviceLocation.latitude,
+      longitude: serviceLocation.longitude,
       address_validated: serviceLocation.address_validated,
     };
 
@@ -331,8 +337,8 @@ const ClientModal: React.FC<ClientModalProps> = ({ isOpen, onClose, client, onSa
                       city: serviceLocation.city,
                       state: serviceLocation.state,
                       postal_code: serviceLocation.postal_code,
-                      latitude: null,
-                      longitude: null,
+                      latitude: serviceLocation.latitude,
+                      longitude: serviceLocation.longitude,
                     }}
                     onChange={(address) => {
                       setServiceLocation(prevState => ({
@@ -343,6 +349,8 @@ const ClientModal: React.FC<ClientModalProps> = ({ isOpen, onClose, client, onSa
                         city: address.city,
                         state: address.state,
                         postal_code: address.postal_code,
+                        latitude: address.latitude,
+                        longitude: address.longitude,
                         address_validated: true,
                       }));
                     }}
