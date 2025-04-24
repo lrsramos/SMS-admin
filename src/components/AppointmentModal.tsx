@@ -40,10 +40,11 @@ const AppointmentModal: React.FC<AppointmentModalProps> = ({
 }) => {
   const [clients, setClients] = useState<Client[]>([]);
   const [selectedClient, setSelectedClient] = useState<Client | null>(null);
-  const [serviceLocations, setServiceLocations] = useState<ServiceLocation[]>([]);
+  const [clientAddresses, setClientAddresses] = useState<ServiceLocation[]>([]);
   const [selectedLocation, setSelectedLocation] = useState<ServiceLocation | null>(null);
   const [loading, setLoading] = useState(false);
   const [errors, setErrors] = useState<Record<string, string>>({});
+  const [serviceLocations, setServiceLocations] = useState<ServiceLocation[]>([]);
   const [serviceTypes, setServiceTypes] = useState<ServiceType[]>([]);
   const [serviceTasks, setServiceTasks] = useState<ServiceTask[]>([]);
   const [formData, setFormData] = useState<Partial<Appointment>>(
@@ -62,6 +63,7 @@ const AppointmentModal: React.FC<AppointmentModalProps> = ({
   const [selectedServiceType, setSelectedServiceType] = useState<string | null>(null);
   const [selectedTasks, setSelectedTasks] = useState<string[]>([]);
   const [additionalNotes, setAdditionalNotes] = useState<string>('');
+  const [preferredTime, setPreferredTime] = useState<string | null>(null);
 
   useEffect(() => {
     fetchClients();
@@ -95,6 +97,7 @@ const AppointmentModal: React.FC<AppointmentModalProps> = ({
       setAdditionalNotes('');
       setSelectedClient(null);
       setSelectedLocation(null);
+      setPreferredTime(null);
     }
   }, [isOpen, appointment]);
 
@@ -140,6 +143,38 @@ const AppointmentModal: React.FC<AppointmentModalProps> = ({
     }
   };
 
+  const fetchClientAddresses = async (clientId: string) => {
+    try {
+      const { data, error } = await supabase
+        .from('service_locations')
+        .select('*')
+        .eq('client_id', clientId);
+
+      if (error) throw error;
+      
+      const addresses = data || [];
+      setClientAddresses(addresses);
+
+      // If client has only one address, select it automatically
+      if (addresses.length === 1) {
+        setSelectedLocation(addresses[0]);
+        setFormData(prev => ({
+          ...prev,
+          service_location_id: addresses[0].id
+        }));
+      } else {
+        // Reset location selection if client has multiple addresses
+        setSelectedLocation(null);
+        setFormData(prev => ({
+          ...prev,
+          service_location_id: null
+        }));
+      }
+    } catch (error) {
+      console.error('Error fetching client addresses:', error);
+    }
+  };
+
   const validateForm = () => {
     const newErrors: Record<string, string> = {};
 
@@ -167,8 +202,18 @@ const AppointmentModal: React.FC<AppointmentModalProps> = ({
     setLoading(true);
     try {
       const serviceType = serviceTypes.find(st => st.id === selectedServiceType);
+      
+      // Combine date and time into scheduled_at
+      const date = formData.date as string;
+      const time = formData.time as string;
+      const scheduled_at = date && time ? `${date}T${time}:00` : null;
+
+      // Create a new object without date and time fields
+      const { date: _, time: __, ...formDataWithoutDateTime } = formData;
+
       await onSave({
-        ...formData,
+        ...formDataWithoutDateTime,
+        scheduled_at,
         service_type_id: selectedServiceType,
         service_tasks: selectedTasks,
         additional_notes: additionalNotes,
@@ -190,12 +235,30 @@ const AppointmentModal: React.FC<AppointmentModalProps> = ({
       setFormData(prev => ({
         ...prev,
         client_id: client.id,
+        service_location_id: null // Reset location when client changes
       }));
+      fetchClientAddresses(client.id);
+      
+      // Set preferred time if available
+      if (client.preferred_time) {
+        setPreferredTime(client.preferred_time);
+        // Set the time in the form data
+        setFormData(prev => ({
+          ...prev,
+          time: client.preferred_time
+        }));
+      } else {
+        setPreferredTime(null);
+      }
+    } else {
+      setClientAddresses([]);
+      setSelectedLocation(null);
+      setPreferredTime(null);
     }
   };
 
   const handleLocationChange = (locationId: string) => {
-    const location = serviceLocations.find(loc => loc.id === locationId);
+    const location = clientAddresses.find(loc => loc.id === locationId);
     setSelectedLocation(location || null);
     if (location) {
       setFormData(prev => ({
@@ -205,9 +268,45 @@ const AppointmentModal: React.FC<AppointmentModalProps> = ({
     }
   };
 
+  const handleInputChange = (field: string, value: any) => {
+    setFormData(prev => ({
+      ...prev,
+      [field]: value
+    }));
+  };
+
   const mapCenter = formData.latitude && formData.longitude
     ? { lat: formData.latitude, lng: formData.longitude }
     : DEFAULT_CENTER;
+
+  // Add useEffect to handle date/time initialization
+  useEffect(() => {
+    if (isOpen && appointment) {
+      // If we have an existing appointment, split scheduled_at into date and time
+      if (appointment.scheduled_at) {
+        const date = new Date(appointment.scheduled_at);
+        const formattedDate = date.toISOString().split('T')[0];
+        const formattedTime = date.toTimeString().slice(0, 5);
+        
+        setFormData(prev => ({
+          ...prev,
+          date: formattedDate,
+          time: formattedTime
+        }));
+      }
+    }
+  }, [isOpen, appointment]);
+
+  // Add useEffect to handle date/time changes
+  useEffect(() => {
+    if (formData.date && formData.time) {
+      const scheduled_at = `${formData.date}T${formData.time}:00`;
+      setFormData(prev => ({
+        ...prev,
+        scheduled_at
+      }));
+    }
+  }, [formData.date, formData.time]);
 
   return (
     <Dialog open={isOpen} onClose={onClose} className="relative z-50">
@@ -308,15 +407,23 @@ const AppointmentModal: React.FC<AppointmentModalProps> = ({
                     <Clock className="w-4 h-4 inline-block mr-1" />
                     Horário
                   </label>
-                  <input
-                    type="time"
-                    value={formData.time || ''}
-                    onChange={(e) => handleInputChange('time', e.target.value)}
-                    className={`${inputStyles.base} ${
-                      errors.time ? inputStyles.error : ''
-                    }`}
-                    required
-                  />
+                  <div className="flex items-center gap-2">
+                    <input
+                      type="time"
+                      value={formData.time || ''}
+                      onChange={(e) => handleInputChange('time', e.target.value)}
+                      className={`${inputStyles.base} flex-1 ${
+                        errors.time ? inputStyles.error : ''
+                      }`}
+                      required
+                    />
+                    {preferredTime && (
+                      <div className="flex items-center gap-1 text-sm text-primary-600 bg-primary-50 px-2 py-1 rounded">
+                        <Clock className="w-4 h-4" />
+                        <span>Preferência: {preferredTime}</span>
+                      </div>
+                    )}
+                  </div>
                   {errors.time && (
                     <p className="mt-1 text-sm text-error-600">{errors.time}</p>
                   )}
@@ -328,15 +435,16 @@ const AppointmentModal: React.FC<AppointmentModalProps> = ({
                     Local
                   </label>
                   <select
-                    value={formData.location_id || ''}
+                    value={formData.service_location_id || ''}
                     onChange={(e) => handleLocationChange(e.target.value)}
                     className={`${inputStyles.base} ${
                       errors.location ? inputStyles.error : ''
                     }`}
                     required
+                    disabled={!selectedClient || clientAddresses.length === 0}
                   >
                     <option value="">Selecione um local</option>
-                    {selectedClient?.service_locations?.map((location) => (
+                    {clientAddresses.map((location) => (
                       <option key={location.id} value={location.id}>
                         {location.street}, {location.street_number} - {location.neighborhood}
                       </option>
