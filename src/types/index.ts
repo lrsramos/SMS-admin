@@ -1,3 +1,4 @@
+// Type definitions for the Pool Cleaner application
 export type ServiceLocation = {
   id: string;
   client_id: string;
@@ -36,7 +37,7 @@ export type AppointmentStatus = 'scheduled' | 'in_progress' | 'completed' | 'can
 
 export type ServiceFrequency = 'weekly' | 'bi_weekly' | 'monthly' | 'one_time';
 
-export type ServiceType = {
+export interface ServiceType {
   id: string;
   name: string;
   description: string;
@@ -44,16 +45,16 @@ export type ServiceType = {
   price: number;
   frequency: ServiceFrequency;
   created_at: string;
-};
+}
 
-export type ServiceTask = {
+export interface ServiceTask {
   id: string;
   name: string;
   description: string;
   duration_minutes: number;
   price: number;
   created_at: string;
-};
+}
 
 export type Client = {
   id: string;
@@ -64,22 +65,22 @@ export type Client = {
   active: boolean;
 };
 
-export type Appointment = {
+export interface Appointment {
   id: string;
   client_id: string;
   cleaner_id: string;
   service_location_id: string;
+  service_type_id?: string;
+  service_tasks?: string[];
   scheduled_at: string;
   status: AppointmentStatus;
-  description: string;
-  service_type_id: string | null;
-  service_tasks: string[];
-  additional_notes: string | null;
-  frequency: ServiceFrequency | null;
+  description?: string;
+  additional_notes?: string;
+  frequency?: ServiceFrequency;
   created_at: string;
-  updated_at: string;
   client?: Client;
   cleaner?: Cleaner;
   service_location?: ServiceLocation;
   service_type?: ServiceType;
-};
+  tasks?: ServiceTask[];
+}

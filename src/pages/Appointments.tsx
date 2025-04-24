@@ -1,3 +1,4 @@
+// Appointments page component
 import React, { useState, useEffect } from 'react';
 import { format, startOfWeek, endOfWeek, startOfDay, endOfDay, subWeeks } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
@@ -5,7 +6,7 @@ import { Plus, Search, Filter, MapPin, Clock, User, Calendar } from 'lucide-reac
 import { MapContainer, TileLayer, Marker, Popup } from 'react-leaflet';
 import { Icon } from 'leaflet';
 import 'leaflet/dist/leaflet.css';
-import { Appointment, Cleaner, Client } from '../types';
+import { Appointment, Cleaner, Client, ServiceLocation, ServiceTask, ServiceType } from '../types/models';
 import AppointmentModal from '../components/AppointmentModal';
 import { supabase } from '../lib/supabase';
 
@@ -24,6 +25,9 @@ const Appointments: React.FC = () => {
   const [appointments, setAppointments] = useState<Appointment[]>([]);
   const [cleaners, setCleaners] = useState<Cleaner[]>([]);
   const [clients, setClients] = useState<Client[]>([]);
+  const [serviceLocations, setServiceLocations] = useState<ServiceLocation[]>([]);
+  const [serviceTasks, setServiceTasks] = useState<ServiceTask[]>([]);
+  const [serviceTypes, setServiceTypes] = useState<ServiceType[]>([]);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [selectedAppointment, setSelectedAppointment] = useState<Appointment | undefined>();
   const [filters, setFilters] = useState({
@@ -42,26 +46,22 @@ const Appointments: React.FC = () => {
     fetchAppointments();
     fetchCleaners();
     fetchClients();
+    fetchServiceLocations();
+    fetchServiceTasks();
+    fetchServiceTypes();
   }, [filters]);
 
   const fetchAppointments = async () => {
     try {
       setLoading(true);
+      // First, let's fetch just the appointments
       let query = supabase
         .from('appointments')
-        .select(`
-          *,
-          cleaners (
-            name,
-            email,
-            personal_phone,
-            company_phone
-          )
-        `);
+        .select('*');
 
       if (filters.dateRange !== 'all') {
-        let startDate: Date;
-        let endDate: Date;
+        let startDate: Date | undefined;
+        let endDate: Date | undefined;
 
         switch (filters.dateRange) {
           case 'today':
@@ -98,24 +98,54 @@ const Appointments: React.FC = () => {
       }
 
       if (filters.clientId) {
-        query = query.eq('client_name', filters.clientId);
+        query = query.eq('client_id', filters.clientId);
       }
 
       if (filters.status !== 'all') {
         query = query.eq('status', filters.status);
       }
 
-      if (filters.searchTerm) {
-        query = query.or(`
-          client_name.ilike.%${filters.searchTerm}%,
-          address.ilike.%${filters.searchTerm}%
-        `);
+      const { data: appointmentsData, error: appointmentsError } = await query.order('scheduled_at', { ascending: true });
+
+      if (appointmentsError) throw appointmentsError;
+
+      // Now let's fetch related data separately
+      if (appointmentsData && appointmentsData.length > 0) {
+        const clientIds = [...new Set(appointmentsData.map(a => a.client_id))];
+        const cleanerIds = [...new Set(appointmentsData.map(a => a.cleaner_id))];
+        const locationIds = [...new Set(appointmentsData.map(a => a.service_location_id))];
+        const serviceTypeIds = [...new Set(appointmentsData.map(a => a.service_type_id).filter(Boolean))];
+
+        const [
+          { data: clientsData, error: clientsError },
+          { data: cleanersData, error: cleanersError },
+          { data: locationsData, error: locationsError },
+          { data: serviceTypesData, error: serviceTypesError }
+        ] = await Promise.all([
+          supabase.from('clients').select('*').in('id', clientIds),
+          supabase.from('cleaners').select('*').in('id', cleanerIds),
+          supabase.from('service_locations').select('*').in('id', locationIds),
+          serviceTypeIds.length > 0 ? supabase.from('service_types').select('*').in('id', serviceTypeIds) : Promise.resolve({ data: [], error: null })
+        ]);
+
+        if (clientsError) throw clientsError;
+        if (cleanersError) throw cleanersError;
+        if (locationsError) throw locationsError;
+        if (serviceTypesError) throw serviceTypesError;
+
+        // Map related data to appointments
+        const enrichedAppointments = appointmentsData.map(appointment => ({
+          ...appointment,
+          client: clientsData?.find(c => c.id === appointment.client_id),
+          cleaner: cleanersData?.find(c => c.id === appointment.cleaner_id),
+          service_location: locationsData?.find(l => l.id === appointment.service_location_id),
+          service_type: serviceTypesData?.find(t => t.id === appointment.service_type_id)
+        }));
+
+        setAppointments(enrichedAppointments as unknown as Appointment[]);
+      } else {
+        setAppointments([]);
       }
-
-      const { data, error } = await query.order('scheduled_at', { ascending: true });
-
-      if (error) throw error;
-      setAppointments(data || []);
     } catch (error) {
       console.error('Error fetching appointments:', error);
     } finally {
@@ -145,27 +175,103 @@ const Appointments: React.FC = () => {
         .order('name');
 
       if (error) throw error;
-      setClients(data || []);
+      setClients(data as unknown as Client[]);
     } catch (error) {
       console.error('Error fetching clients:', error);
     }
   };
 
+  const fetchServiceLocations = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('service_locations')
+        .select('*');
+
+      if (error) throw error;
+      setServiceLocations(data as unknown as ServiceLocation[]);
+    } catch (error) {
+      console.error('Error fetching service locations:', error);
+    }
+  };
+
+  const fetchServiceTasks = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('service_tasks')
+        .select('*');
+
+      if (error) throw error;
+      setServiceTasks(data as unknown as ServiceTask[]);
+    } catch (error) {
+      console.error('Error fetching service tasks:', error);
+    }
+  };
+
+  const fetchServiceTypes = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('service_types')
+        .select('*');
+
+      if (error) throw error;
+      setServiceTypes(data as unknown as ServiceType[]);
+    } catch (error) {
+      console.error('Error fetching service types:', error);
+    }
+  };
+
   const handleSaveAppointment = async (appointment: Partial<Appointment>) => {
     try {
+      // Validate required fields
+      if (!appointment.client_id || !appointment.cleaner_id || !appointment.scheduled_at || !appointment.service_location_id) {
+        throw new Error('Missing required fields');
+      }
+
+      const appointmentData = {
+        client_id: appointment.client_id,
+        cleaner_id: appointment.cleaner_id,
+        scheduled_at: appointment.scheduled_at,
+        status: appointment.status || 'scheduled',
+        service_location_id: appointment.service_location_id,
+        service_type_id: appointment.service_type_id || null,
+        service_tasks: appointment.service_tasks || [],
+        additional_notes: appointment.additional_notes || '',
+        description: appointment.description || '',
+        frequency: appointment.frequency || null
+      };
+
+      // Log the appointment data being saved
+      console.log('Saving appointment data:', appointmentData);
+      console.log('Original appointment data:', appointment);
+      console.log('Additional notes value:', appointment.additional_notes);
+      console.log('Service type ID value:', appointment.service_type_id);
+      console.log('Service type ID in appointmentData:', appointmentData.service_type_id);
+      console.log('Frequency value:', appointment.frequency);
+      console.log('Frequency in appointmentData:', appointmentData.frequency);
+
       if (selectedAppointment) {
+        console.log('Updating existing appointment with ID:', selectedAppointment.id);
         const { error } = await supabase
           .from('appointments')
-          .update(appointment)
+          .update(appointmentData)
           .eq('id', selectedAppointment.id);
 
-        if (error) throw error;
+        if (error) {
+          console.error('Error updating appointment:', error);
+          throw error;
+        }
+        console.log('Appointment updated successfully');
       } else {
+        console.log('Creating new appointment');
         const { error } = await supabase
           .from('appointments')
-          .insert([appointment]);
+          .insert([appointmentData]);
 
-        if (error) throw error;
+        if (error) {
+          console.error('Error creating appointment:', error);
+          throw error;
+        }
+        console.log('Appointment created successfully');
       }
 
       fetchAppointments();
@@ -374,6 +480,12 @@ const Appointments: React.FC = () => {
                   Endereço
                 </th>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  Tipo de Serviço
+                </th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  Tarefas
+                </th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                   Status
                 </th>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
@@ -385,7 +497,7 @@ const Appointments: React.FC = () => {
             <tbody className="bg-white divide-y divide-gray-200">
               {loading ? (
                 <tr>
-                  <td colSpan={6} className="px-6 py-4 text-center">
+                  <td colSpan={8} className="px-6 py-4 text-center">
                     <div className="flex items-center justify-center">
                       <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-blue-600"></div>
                       <span className="ml-2">Carregando...</span>
@@ -394,7 +506,7 @@ const Appointments: React.FC = () => {
                 </tr>
               ) : appointments.length === 0 ? (
                 <tr>
-                  <td colSpan={6} className="px-6 py-4 text-center text-gray-500">
+                  <td colSpan={8} className="px-6 py-4 text-center text-gray-500">
                     Nenhum agendamento encontrado
                   </td>
                 </tr>
@@ -410,12 +522,12 @@ const Appointments: React.FC = () => {
                   >
                     <td className="px-6 py-4 whitespace-nowrap">
                       <div className="text-sm font-medium text-gray-900">
-                        {appointment.client_name}
+                        {appointment.client?.name}
                       </div>
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap">
                       <div className="text-sm text-gray-900">
-                        {cleaners.find(c => c.id === appointment.cleaner_id)?.name}
+                        {appointment.cleaner?.name}
                       </div>
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap">
@@ -425,7 +537,36 @@ const Appointments: React.FC = () => {
                     </td>
                     <td className="px-6 py-4">
                       <div className="text-sm text-gray-900 line-clamp-2">
-                        {appointment.address}
+                        {appointment.service_location ? 
+                          `${appointment.service_location.street}, ${appointment.service_location.street_number} - ${appointment.service_location.neighborhood}, ${appointment.service_location.city}` 
+                          : 'Endereço não disponível'}
+                      </div>
+                    </td>
+                    <td className="px-6 py-4">
+                      <div className="text-sm text-gray-900">
+                        {appointment.service_type_id ? (
+                          serviceTypes.find(type => type.id === appointment.service_type_id)?.name || 'Tipo não encontrado'
+                        ) : (
+                          'Não especificado'
+                        )}
+                      </div>
+                    </td>
+                    <td className="px-6 py-4">
+                      <div className="text-sm text-gray-900">
+                        {appointment.service_tasks && appointment.service_tasks.length > 0 ? (
+                          <div className="flex flex-wrap gap-1">
+                            {appointment.service_tasks.map((taskId) => {
+                              const task = serviceTasks.find(t => t.id === taskId);
+                              return task ? (
+                                <span key={taskId} className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-blue-100 text-blue-800">
+                                  {task.name}
+                                </span>
+                              ) : null;
+                            })}
+                          </div>
+                        ) : (
+                          'Nenhuma tarefa'
+                        )}
                       </div>
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap">
@@ -494,10 +635,13 @@ const Appointments: React.FC = () => {
                       Detalhes do Agendamento
                     </h3>
                     
-                    {selectedAppointment?.latitude && selectedAppointment?.longitude && (
+                    {selectedAppointment.service_location?.latitude && selectedAppointment.service_location?.longitude && (
                       <div className="h-64 rounded-lg overflow-hidden border border-gray-300 mb-4">
                         <MapContainer
-                          center={{ lat: selectedAppointment.latitude, lng: selectedAppointment.longitude }}
+                          center={{ 
+                            lat: selectedAppointment.service_location.latitude, 
+                            lng: selectedAppointment.service_location.longitude 
+                          }}
                           zoom={15}
                           style={{ height: '100%', width: '100%' }}
                         >
@@ -506,13 +650,16 @@ const Appointments: React.FC = () => {
                             attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
                           />
                           <Marker 
-                            position={{ lat: selectedAppointment.latitude, lng: selectedAppointment.longitude }}
+                            position={{ 
+                              lat: selectedAppointment.service_location.latitude, 
+                              lng: selectedAppointment.service_location.longitude 
+                            }}
                             icon={customIcon}
                           >
                             <Popup>
                               <div className="text-sm">
-                                <p className="font-medium">{selectedAppointment.client_name}</p>
-                                <p>{selectedAppointment.address}</p>
+                                <p className="font-medium">{selectedAppointment.client?.name}</p>
+                                <p>{`${selectedAppointment.service_location.street}, ${selectedAppointment.service_location.street_number}`}</p>
                               </div>
                             </Popup>
                           </Marker>
@@ -525,7 +672,9 @@ const Appointments: React.FC = () => {
                         <User className="h-5 w-5 text-gray-400 mr-2" />
                         <div>
                           <p className="text-sm font-medium text-gray-500">Cliente</p>
-                          <p className="text-sm text-gray-900">{selectedAppointment.client_name}</p>
+                          <p className="text-sm text-gray-900">{selectedAppointment.client?.name}</p>
+                          <p className="text-xs text-gray-500">{selectedAppointment.client?.email}</p>
+                          <p className="text-xs text-gray-500">{selectedAppointment.client?.phone}</p>
                         </div>
                       </div>
 
@@ -545,43 +694,41 @@ const Appointments: React.FC = () => {
                         <MapPin className="h-5 w-5 text-gray-400 mr-2 mt-0.5" />
                         <div>
                           <p className="text-sm font-medium text-gray-500">Endereço</p>
-                          <p className="text-sm text-gray-900">{selectedAppointment.address}</p>
+                          {selectedAppointment.service_location ? (
+                            <>
+                              <p className="text-sm text-gray-900">
+                                {`${selectedAppointment.service_location.street}, ${selectedAppointment.service_location.street_number}`}
+                              </p>
+                              <p className="text-sm text-gray-900">
+                                {`${selectedAppointment.service_location.neighborhood}`}
+                              </p>
+                              <p className="text-sm text-gray-900">
+                                {`${selectedAppointment.service_location.city} - ${selectedAppointment.service_location.state}`}
+                              </p>
+                              <p className="text-sm text-gray-900">
+                                {selectedAppointment.service_location.zip_code}
+                              </p>
+                            </>
+                          ) : (
+                            <p className="text-sm text-gray-500">Endereço não disponível</p>
+                          )}
                         </div>
                       </div>
-
-                      {selectedAppointment.started_at && (
-                        <div className="flex items-center">
-                          <Clock className="h-5 w-5 text-gray-400 mr-2" />
-                          <div>
-                            <p className="text-sm font-medium text-gray-500">Início do Serviço</p>
-                            <p className="text-sm text-gray-900">
-                              {format(new Date(selectedAppointment.started_at), "PPp", {
-                                locale: ptBR,
-                              })}
-                            </p>
-                          </div>
-                        </div>
-                      )}
-
-                      {selectedAppointment.completed_at && (
-                        <div className="flex items-center">
-                          <Clock className="h-5 w-5 text-gray-400 mr-2" />
-                          <div>
-                            <p className="text-sm font-medium text-gray-500">Conclusão</p>
-                            <p className="text-sm text-gray-900">
-                              {format(new Date(selectedAppointment.completed_at), "PPp", {
-                                locale: ptBR,
-                              })}
-                            </p>
-                          </div>
-                        </div>
-                      )}
 
                       {selectedAppointment.description && (
                         <div>
                           <p className="text-sm font-medium text-gray-500">Descrição</p>
                           <p className="text-sm text-gray-900 mt-1">
                             {selectedAppointment.description}
+                          </p>
+                        </div>
+                      )}
+
+                      {selectedAppointment.additional_notes && (
+                        <div>
+                          <p className="text-sm font-medium text-gray-500">Notas Adicionais</p>
+                          <p className="text-sm text-gray-900 mt-1">
+                            {selectedAppointment.additional_notes}
                           </p>
                         </div>
                       )}

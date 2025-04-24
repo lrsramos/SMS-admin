@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Dialog } from '@headlessui/react';
 import { X, MapPin, Calendar, Clock, User, Briefcase, FileText, CheckSquare } from 'lucide-react';
-import { format } from 'date-fns';
+import { format, addHours } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { MapContainer, TileLayer, Marker, Popup } from 'react-leaflet';
 import { Icon } from 'leaflet';
@@ -57,7 +57,8 @@ const AppointmentModal: React.FC<AppointmentModalProps> = ({
       service_type_id: null,
       service_tasks: [],
       additional_notes: null,
-      frequency: null
+      frequency: null,
+      service_location_id: ''
     }
   );
   const [selectedServiceType, setSelectedServiceType] = useState<string | null>(null);
@@ -90,7 +91,8 @@ const AppointmentModal: React.FC<AppointmentModalProps> = ({
         service_type_id: null,
         service_tasks: [],
         additional_notes: null,
-        frequency: null
+        frequency: null,
+        service_location_id: ''
       });
       setSelectedServiceType(null);
       setSelectedTasks([]);
@@ -201,24 +203,46 @@ const AppointmentModal: React.FC<AppointmentModalProps> = ({
 
     setLoading(true);
     try {
-      const serviceType = serviceTypes.find(st => st.id === selectedServiceType);
+      console.log('Selected service type before submit:', selectedServiceType);
+      console.log('Form data before submit:', formData);
+      console.log('Service types available:', serviceTypes);
       
-      // Combine date and time into scheduled_at
+      const serviceType = serviceTypes.find(st => st.id === selectedServiceType);
+      console.log('Found service type:', serviceType);
+      
+      // Combine date and time into scheduled_at, adjusting for Brazil timezone (GMT-3)
       const date = formData.date as string;
       const time = formData.time as string;
-      const scheduled_at = date && time ? `${date}T${time}:00` : null;
+      let scheduled_at: string | undefined;
+      
+      if (date && time) {
+        // Create a date object in local time
+        const localDate = new Date(`${date}T${time}:00`);
+        // Adjust for Brazil timezone (GMT-3)
+        const brazilDate = addHours(localDate, -3);
+        // Format to ISO string
+        scheduled_at = brazilDate.toISOString();
+      }
 
       // Create a new object without date and time fields
       const { date: _, time: __, ...formDataWithoutDateTime } = formData;
 
-      await onSave({
-        ...formDataWithoutDateTime,
-        scheduled_at,
+      // Remove any nested objects that shouldn't be sent to the database
+      const { cleaner, client, service_location, service_type, ...cleanFormData } = formDataWithoutDateTime;
+
+      const appointmentData = {
+        ...cleanFormData,
+        scheduled_at: scheduled_at || formData.scheduled_at,
         service_type_id: selectedServiceType,
         service_tasks: selectedTasks,
         additional_notes: additionalNotes,
         frequency: serviceType?.frequency || null
-      });
+      };
+      
+      console.log('Final appointment data to be saved:', appointmentData);
+      console.log('Service type ID in final data:', appointmentData.service_type_id);
+
+      await onSave(appointmentData);
       onClose();
     } catch (error) {
       console.error('Error saving appointment:', error);
@@ -269,10 +293,23 @@ const AppointmentModal: React.FC<AppointmentModalProps> = ({
   };
 
   const handleInputChange = (field: string, value: any) => {
-    setFormData(prev => ({
-      ...prev,
-      [field]: value
-    }));
+    if (field === 'additional_notes') {
+      setAdditionalNotes(value);
+      setFormData(prev => ({
+        ...prev,
+        additional_notes: value
+      }));
+    } else {
+      console.log(`Input change - field: ${field}, value:`, value);
+      setFormData(prev => {
+        const newData = {
+          ...prev,
+          [field]: value
+        };
+        console.log('Updated formData:', newData);
+        return newData;
+      });
+    }
   };
 
   const mapCenter = formData.latitude && formData.longitude
@@ -300,7 +337,13 @@ const AppointmentModal: React.FC<AppointmentModalProps> = ({
   // Add useEffect to handle date/time changes
   useEffect(() => {
     if (formData.date && formData.time) {
-      const scheduled_at = `${formData.date}T${formData.time}:00`;
+      // Create a date object in local time
+      const localDate = new Date(`${formData.date}T${formData.time}:00`);
+      // Adjust for Brazil timezone (GMT-3)
+      const brazilDate = addHours(localDate, -3);
+      // Format to ISO string
+      const scheduled_at = brazilDate.toISOString();
+      
       setFormData(prev => ({
         ...prev,
         scheduled_at
@@ -484,16 +527,12 @@ const AppointmentModal: React.FC<AppointmentModalProps> = ({
                       <label key={task.id} className="flex items-center space-x-2">
                         <input
                           type="checkbox"
-                          checked={formData.service_tasks?.includes(task.id) || false}
+                          checked={selectedTasks.includes(task.id)}
                           onChange={(e) => {
-                            const tasks = formData.service_tasks || [];
                             if (e.target.checked) {
-                              handleInputChange('service_tasks', [...tasks, task.id]);
+                              setSelectedTasks(prev => [...prev, task.id]);
                             } else {
-                              handleInputChange(
-                                'service_tasks',
-                                tasks.filter((id) => id !== task.id)
-                              );
+                              setSelectedTasks(prev => prev.filter(id => id !== task.id));
                             }
                           }}
                           className="h-4 w-4 text-primary-600 focus:ring-primary-500 border-secondary-300 rounded"
@@ -510,8 +549,8 @@ const AppointmentModal: React.FC<AppointmentModalProps> = ({
                     Observações
                   </label>
                   <textarea
-                    value={formData.notes || ''}
-                    onChange={(e) => handleInputChange('notes', e.target.value)}
+                    value={formData.additional_notes || ''}
+                    onChange={(e) => handleInputChange('additional_notes', e.target.value)}
                     className={inputStyles.base}
                     rows={3}
                   />
