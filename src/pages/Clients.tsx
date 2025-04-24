@@ -198,115 +198,83 @@ const Clients = () => {
         </button>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-        {clients?.map((client) => (
-          <div
-            key={client.id}
-            className="bg-white rounded-lg shadow-md overflow-hidden hover:shadow-lg transition-shadow"
-          >
-            <div className="p-6">
-              <div className="flex justify-between items-start mb-4">
-                <h2 className="text-xl font-semibold text-gray-900">{client.name}</h2>
-                <button
-                  onClick={() => {
-                    setSelectedClient(client);
-                    setIsModalOpen(true);
-                  }}
-                  className="text-sm text-blue-600 hover:text-blue-800 font-medium"
-                >
-                  Editar
-                </button>
-              </div>
-
-              <div className="space-y-2">
-                {client.service_locations?.[0] && (
-                  <div className="flex items-start text-gray-600">
-                    <MapPin className="w-4 h-4 mr-2 mt-1 flex-shrink-0" />
-                    <span className="whitespace-pre-wrap">
-                      {`${client.service_locations[0].street}, ${client.service_locations[0].street_number}${client.service_locations[0].complemento ? ` - ${client.service_locations[0].complemento}` : ''}\n${client.service_locations[0].neighborhood}, ${client.service_locations[0].city} - ${client.service_locations[0].state}\nCEP: ${client.service_locations[0].postal_code}`}
-                    </span>
-                  </div>
-                )}
-                {client.email && (
-                  <div className="flex items-center text-gray-600">
-                    <Mail className="w-4 h-4 mr-2" />
-                    <a href={`mailto:${client.email}`} className="hover:text-blue-600">
-                      {client.email}
-                    </a>
-                  </div>
-                )}
-                {client.telefone && (
-                  <div className="flex items-center text-gray-600">
-                    <Phone className="w-4 h-4 mr-2" />
-                    <a href={`tel:${client.telefone}`} className="hover:text-blue-600">
-                      {client.telefone}
-                    </a>
-                  </div>
-                )}
-              </div>
-
-              <div className="mt-4 space-y-2 text-sm text-gray-600">
-                {client.service_locations?.[0]?.tipo_piscina && (
-                  <div>
-                    <span className="font-medium">Tipo de Piscina:</span> {client.service_locations[0].tipo_piscina}
-                  </div>
-                )}
-                {client.service_locations?.[0]?.tamanho_piscina && (
-                  <div>
-                    <span className="font-medium">Tamanho:</span> {client.service_locations[0].tamanho_piscina}
-                  </div>
-                )}
-                {client.frequencia_limpeza && (
-                  <div>
-                    <span className="font-medium">Frequência:</span> {client.frequencia_limpeza}
-                  </div>
-                )}
-              </div>
-
-              <div className="mt-6">
-                <button
-                  onClick={() => setExpandedClient(expandedClient === client.name ? null : client.name)}
-                  className="text-sm text-gray-600 hover:text-gray-800"
-                >
-                  {expandedClient === client.name ? 'Ocultar Agendamentos' : 'Ver Agendamentos'}
-                </button>
-
-                {expandedClient === client.name && appointments && (
-                  <div className="mt-4 space-y-3">
-                    <h3 className="text-sm font-medium text-gray-700">Agendamentos Recentes</h3>
-                    {appointments.length > 0 ? (
-                      appointments.map((appointment) => (
-                        <div
-                          key={appointment.id}
-                          className="text-sm p-3 bg-gray-50 rounded-md"
-                        >
-                          <div className="flex justify-between">
-                            <span className="font-medium">
-                              {format(parseISO(appointment.scheduled_at), "PPp", { locale: ptBR })}
-                            </span>
-                            <span
-                              className={`px-2 py-0.5 rounded-full text-xs font-medium
-                                ${appointment.status === 'completed' ? 'bg-green-100 text-green-800' : 
-                                  appointment.status === 'in_progress' ? 'bg-yellow-100 text-yellow-800' : 
-                                  'bg-blue-100 text-blue-800'}`}
-                            >
-                              {getStatusText(appointment.status)}
-                            </span>
-                          </div>
-                          {appointment.description && (
-                            <p className="mt-1 text-gray-600">{appointment.description}</p>
-                          )}
-                        </div>
-                      ))
-                    ) : (
-                      <p className="text-sm text-gray-500">Nenhum agendamento encontrado</p>
+      <div className="bg-white rounded-lg shadow overflow-hidden">
+        <table className="min-w-full divide-y divide-gray-200">
+          <thead className="bg-gray-50">
+            <tr>
+              <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                Nome
+              </th>
+              <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                Endereço
+              </th>
+              <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                Contato
+              </th>
+              <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                Ações
+              </th>
+            </tr>
+          </thead>
+          <tbody className="bg-white divide-y divide-gray-200">
+            {clients?.map((client) => (
+              <tr key={client.id} className="hover:bg-gray-50">
+                <td className="px-6 py-4 whitespace-nowrap">
+                  <div className="text-sm font-medium text-gray-900">{client.name}</div>
+                </td>
+                <td className="px-6 py-4">
+                  {client.service_locations?.[0] && (
+                    <div className="text-sm text-gray-500">
+                      <div className="flex items-start">
+                        <MapPin className="w-4 h-4 mr-1 mt-1 flex-shrink-0" />
+                        <span>
+                          {`${client.service_locations[0].street}, ${client.service_locations[0].street_number}${client.service_locations[0].complemento ? ` - ${client.service_locations[0].complemento}` : ''}`}
+                        </span>
+                      </div>
+                      <div className="ml-5">
+                        {`${client.service_locations[0].neighborhood}, ${client.service_locations[0].city} - ${client.service_locations[0].state}`}
+                      </div>
+                      <div className="ml-5">
+                        {`CEP: ${client.service_locations[0].postal_code}`}
+                      </div>
+                    </div>
+                  )}
+                </td>
+                <td className="px-6 py-4">
+                  <div className="text-sm text-gray-500">
+                    {client.email && (
+                      <div className="flex items-center">
+                        <Mail className="w-4 h-4 mr-1" />
+                        <a href={`mailto:${client.email}`} className="hover:text-blue-600">
+                          {client.email}
+                        </a>
+                      </div>
+                    )}
+                    {client.telefone && (
+                      <div className="flex items-center mt-1">
+                        <Phone className="w-4 h-4 mr-1" />
+                        <a href={`tel:${client.telefone}`} className="hover:text-blue-600">
+                          {client.telefone}
+                        </a>
+                      </div>
                     )}
                   </div>
-                )}
-              </div>
-            </div>
-          </div>
-        ))}
+                </td>
+                <td className="px-6 py-4 whitespace-nowrap text-sm">
+                  <button
+                    onClick={() => {
+                      setSelectedClient(client);
+                      setIsModalOpen(true);
+                    }}
+                    className="text-blue-600 hover:text-blue-900 font-medium"
+                  >
+                    Editar
+                  </button>
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
       </div>
 
       <ClientModal

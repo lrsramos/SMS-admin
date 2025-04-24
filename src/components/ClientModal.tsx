@@ -121,6 +121,29 @@ const ClientModal: React.FC<ClientModalProps> = ({ isOpen, onClose, client, onSa
     }
   }, [client, isOpen]);
 
+  const formatPhoneNumber = (value: string) => {
+    // Remove all non-numeric characters
+    const numbers = value.replace(/\D/g, '');
+    
+    // Format based on length
+    if (numbers.length <= 10) {
+      // Format: (XX) XXXX-XXXX
+      return numbers.replace(/(\d{2})(\d{4})(\d{4})/, '($1) $2-$3');
+    } else {
+      // Format: (XX) XXXXX-XXXX
+      return numbers.replace(/(\d{2})(\d{5})(\d{4})/, '($1) $2-$3');
+    }
+  };
+
+  const handlePhoneChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const { value } = e.target;
+    const formattedValue = formatPhoneNumber(value);
+    setFormData(prevState => ({
+      ...prevState,
+      telefone: formattedValue,
+    }));
+  };
+
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     
@@ -284,8 +307,10 @@ const ClientModal: React.FC<ClientModalProps> = ({ isOpen, onClose, client, onSa
                         type="tel"
                         name="telefone"
                         value={formData.telefone}
-                        onChange={handleInputChange}
+                        onChange={handlePhoneChange}
                         className={inputStyles.base}
+                        placeholder="(00) 00000-0000"
+                        maxLength={15}
                         required
                       />
                     </div>
@@ -368,65 +393,91 @@ const ClientModal: React.FC<ClientModalProps> = ({ isOpen, onClose, client, onSa
                       <label className="block text-sm font-medium text-secondary-700">
                         Tipo de Piscina
                       </label>
-                      <input
-                        type="text"
+                      <select
                         name="tipo_piscina"
                         value={serviceLocation.tipo_piscina}
                         onChange={handleServiceLocationChange}
                         className={inputStyles.base}
-                      />
+                      >
+                        <option value="">Selecione...</option>
+                        <option value="fibra">Fibra</option>
+                        <option value="vinil">Vinil</option>
+                        <option value="alvenaria">Alvenaria</option>
+                        <option value="acabamento">Acabamento</option>
+                      </select>
                     </div>
 
                     <div>
                       <label className="block text-sm font-medium text-secondary-700">
                         Tamanho da Piscina
                       </label>
-                      <input
-                        type="text"
+                      <select
                         name="tamanho_piscina"
                         value={serviceLocation.tamanho_piscina}
                         onChange={handleServiceLocationChange}
                         className={inputStyles.base}
-                      />
+                      >
+                        <option value="">Selecione...</option>
+                        <option value="pequena">Pequena (até 20m²)</option>
+                        <option value="media">Média (20m² - 40m²)</option>
+                        <option value="grande">Grande (40m² - 60m²)</option>
+                        <option value="extra_grande">Extra Grande (acima de 60m²)</option>
+                      </select>
                     </div>
 
                     <div>
                       <label className="block text-sm font-medium text-secondary-700">
                         Produtos Utilizados
                       </label>
-                      <input
-                        type="text"
+                      <select
                         name="produtos_utilizados"
                         value={serviceLocation.produtos_utilizados}
                         onChange={handleServiceLocationChange}
                         className={inputStyles.base}
-                      />
+                      >
+                        <option value="">Selecione...</option>
+                        <option value="cloro">Cloro</option>
+                        <option value="ph">pH</option>
+                        <option value="alcalinidade">Alcalinidade</option>
+                        <option value="clarificante">Clarificante</option>
+                        <option value="algicida">Algicida</option>
+                      </select>
                     </div>
 
                     <div>
                       <label className="block text-sm font-medium text-secondary-700">
                         Equipamentos
                       </label>
-                      <input
-                        type="text"
+                      <select
                         name="equipamentos"
                         value={serviceLocation.equipamentos}
                         onChange={handleServiceLocationChange}
                         className={inputStyles.base}
-                      />
+                      >
+                        <option value="">Selecione...</option>
+                        <option value="aspirador">Aspirador</option>
+                        <option value="filtro">Filtro</option>
+                        <option value="bomba">Bomba</option>
+                        <option value="aquecedor">Aquecedor</option>
+                        <option value="clorador">Clorador</option>
+                      </select>
                     </div>
 
                     <div>
                       <label className="block text-sm font-medium text-secondary-700">
                         Horário Preferido
                       </label>
-                      <input
-                        type="text"
+                      <select
                         name="horario_preferido"
                         value={serviceLocation.horario_preferido}
                         onChange={handleServiceLocationChange}
                         className={inputStyles.base}
-                      />
+                      >
+                        <option value="">Selecione...</option>
+                        <option value="manha">Manhã (8h - 12h)</option>
+                        <option value="tarde">Tarde (13h - 17h)</option>
+                        <option value="noite">Noite (18h - 22h)</option>
+                      </select>
                     </div>
 
                     <div className="col-span-2">
@@ -439,6 +490,7 @@ const ClientModal: React.FC<ClientModalProps> = ({ isOpen, onClose, client, onSa
                         onChange={handleServiceLocationChange}
                         rows={3}
                         className={inputStyles.base}
+                        placeholder="Observações adicionais sobre a piscina..."
                       />
                     </div>
                   </Tab.Panel>
