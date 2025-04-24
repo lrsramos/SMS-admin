@@ -8,6 +8,8 @@ import { Icon } from 'leaflet';
 import 'leaflet/dist/leaflet.css';
 import { Appointment, Cleaner, Client, ServiceLocation, ServiceType, ServiceTask, ServiceFrequency } from '../types';
 import { supabase } from '../lib/supabase';
+import { modalStyles, inputStyles, buttonStyles } from '../styles/components';
+import { createComponentStyle } from '../utils/styles';
 
 interface AppointmentModalProps {
   isOpen: boolean;
@@ -209,229 +211,219 @@ const AppointmentModal: React.FC<AppointmentModalProps> = ({
 
   return (
     <Dialog open={isOpen} onClose={onClose} className="relative z-50">
-      <div className="fixed inset-0 bg-black/30" aria-hidden="true" />
-      <div className="fixed inset-0 flex items-center justify-center p-4">
-        <Dialog.Panel className="mx-auto max-w-2xl w-full bg-white rounded-xl shadow-lg">
-          <div className="flex justify-between items-center p-6 border-b">
-            <Dialog.Title className="text-xl font-semibold">
+      <div className={modalStyles.overlay} aria-hidden="true" />
+      <div className={modalStyles.container}>
+        <Dialog.Panel className={`${modalStyles.content} max-h-[90vh] flex flex-col`}>
+          <div className={modalStyles.header}>
+            <Dialog.Title className={modalStyles.title}>
               {appointment ? 'Editar Agendamento' : 'Novo Agendamento'}
             </Dialog.Title>
             <button
               onClick={onClose}
-              className="text-gray-400 hover:text-gray-500"
+              className="text-secondary-400 hover:text-secondary-500"
             >
               <X className="h-5 w-5" />
             </button>
           </div>
 
-          <form onSubmit={handleSubmit} className="p-6 space-y-6">
-            {errors.submit && (
-              <div className="bg-red-50 border border-red-200 rounded-md p-4">
-                <p className="text-sm text-red-600">{errors.submit}</p>
-              </div>
-            )}
+          <form onSubmit={handleSubmit} className="flex-1 overflow-y-auto">
+            <div className="p-6 space-y-4">
+              {errors.submit && (
+                <div className="bg-error-50 border border-error-200 rounded-md p-3">
+                  <p className="text-sm text-error-600">{errors.submit}</p>
+                </div>
+              )}
 
-            <div className="space-y-4">
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  <User className="w-4 h-4 inline-block mr-1" />
-                  Cliente
-                </label>
-                <select
-                  value={formData.client_id || ''}
-                  onChange={(e) => handleClientChange(e.target.value)}
-                  className={`block w-full rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 sm:text-sm ${
-                    errors.client ? 'border-red-300' : 'border-gray-300'
-                  }`}
-                >
-                  <option value="">Selecione um cliente</option>
-                  {clients.map((client) => (
-                    <option key={client.id} value={client.id}>
-                      {client.name}
-                    </option>
-                  ))}
-                </select>
-                {errors.client && (
-                  <p className="mt-1 text-sm text-red-600">{errors.client}</p>
-                )}
-              </div>
-
-              {selectedClient && serviceLocations.length > 0 && (
+              <div className="grid grid-cols-2 gap-4">
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
-                    <MapPin className="w-4 h-4 inline-block mr-1" />
-                    Local de Serviço
+                  <label className="block text-sm font-medium text-secondary-700 mb-1">
+                    <User className="w-4 h-4 inline-block mr-1" />
+                    Cliente
                   </label>
                   <select
-                    value={selectedLocation?.id || ''}
-                    onChange={(e) => handleLocationChange(e.target.value)}
-                    className="block w-full rounded-md border-gray-300 shadow-sm focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
+                    value={formData.client_id || ''}
+                    onChange={(e) => handleClientChange(e.target.value)}
+                    className={`${inputStyles.base} ${
+                      errors.client ? inputStyles.error : ''
+                    }`}
                   >
-                    <option value="">Selecione um endereço</option>
-                    {serviceLocations.map((location) => (
+                    <option value="">Selecione um cliente</option>
+                    {clients.map((client) => (
+                      <option key={client.id} value={client.id}>
+                        {client.name}
+                      </option>
+                    ))}
+                  </select>
+                  {errors.client && (
+                    <p className="mt-1 text-sm text-error-600">{errors.client}</p>
+                  )}
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-secondary-700 mb-1">
+                    <User className="w-4 h-4 inline-block mr-1" />
+                    Limpador
+                  </label>
+                  <select
+                    value={formData.cleaner_id || ''}
+                    onChange={(e) => handleInputChange('cleaner_id', e.target.value)}
+                    className={`${inputStyles.base} ${
+                      errors.cleaner ? inputStyles.error : ''
+                    }`}
+                    required
+                  >
+                    <option value="">Selecione um limpador</option>
+                    {cleaners.map((cleaner) => (
+                      <option key={cleaner.id} value={cleaner.id}>
+                        {cleaner.name}
+                      </option>
+                    ))}
+                  </select>
+                  {errors.cleaner && (
+                    <p className="mt-1 text-sm text-error-600">{errors.cleaner}</p>
+                  )}
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-secondary-700 mb-1">
+                    <Calendar className="w-4 h-4 inline-block mr-1" />
+                    Data
+                  </label>
+                  <input
+                    type="date"
+                    value={formData.date || ''}
+                    onChange={(e) => handleInputChange('date', e.target.value)}
+                    className={`${inputStyles.base} ${
+                      errors.date ? inputStyles.error : ''
+                    }`}
+                    required
+                  />
+                  {errors.date && (
+                    <p className="mt-1 text-sm text-error-600">{errors.date}</p>
+                  )}
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-secondary-700 mb-1">
+                    <Clock className="w-4 h-4 inline-block mr-1" />
+                    Horário
+                  </label>
+                  <input
+                    type="time"
+                    value={formData.time || ''}
+                    onChange={(e) => handleInputChange('time', e.target.value)}
+                    className={`${inputStyles.base} ${
+                      errors.time ? inputStyles.error : ''
+                    }`}
+                    required
+                  />
+                  {errors.time && (
+                    <p className="mt-1 text-sm text-error-600">{errors.time}</p>
+                  )}
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-secondary-700 mb-1">
+                    <MapPin className="w-4 h-4 inline-block mr-1" />
+                    Local
+                  </label>
+                  <select
+                    value={formData.location_id || ''}
+                    onChange={(e) => handleLocationChange(e.target.value)}
+                    className={`${inputStyles.base} ${
+                      errors.location ? inputStyles.error : ''
+                    }`}
+                    required
+                  >
+                    <option value="">Selecione um local</option>
+                    {selectedClient?.service_locations?.map((location) => (
                       <option key={location.id} value={location.id}>
-                        {[
-                          location.street,
-                          location.street_number,
-                          location.neighborhood,
-                        ].filter(Boolean).join(', ')}
-                        {location.is_primary && ' (Principal)'}
+                        {location.street}, {location.street_number} - {location.neighborhood}
+                      </option>
+                    ))}
+                  </select>
+                  {errors.location && (
+                    <p className="mt-1 text-sm text-error-600">{errors.location}</p>
+                  )}
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-secondary-700 mb-1">
+                    <Briefcase className="w-4 h-4 inline-block mr-1" />
+                    Tipo de Serviço
+                  </label>
+                  <select
+                    value={formData.service_type_id || ''}
+                    onChange={(e) => handleInputChange('service_type_id', e.target.value)}
+                    className={inputStyles.base}
+                  >
+                    <option value="">Selecione um tipo de serviço</option>
+                    {serviceTypes.map((type) => (
+                      <option key={type.id} value={type.id}>
+                        {type.name}
                       </option>
                     ))}
                   </select>
                 </div>
-              )}
 
-              {/* Map */}
-              {formData.latitude && formData.longitude && (
-                <div className="h-64 rounded-lg overflow-hidden border border-gray-300">
-                  <MapContainer
-                    center={mapCenter}
-                    zoom={15}
-                    style={{ height: '100%', width: '100%' }}
-                  >
-                    <TileLayer
-                      url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
-                      attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
-                    />
-                    <Marker position={mapCenter} icon={customIcon}>
-                      <Popup>
-                        <div className="text-sm">
-                          <p className="font-medium">{formData.client_name}</p>
-                          <p>{formData.address}</p>
-                        </div>
-                      </Popup>
-                    </Marker>
-                  </MapContainer>
+                <div className="col-span-2">
+                  <label className="block text-sm font-medium text-secondary-700 mb-1">
+                    <CheckSquare className="w-4 h-4 inline-block mr-1" />
+                    Tarefas Adicionais
+                  </label>
+                  <div className="grid grid-cols-2 gap-2">
+                    {serviceTasks.map((task) => (
+                      <label key={task.id} className="flex items-center space-x-2">
+                        <input
+                          type="checkbox"
+                          checked={formData.service_tasks?.includes(task.id) || false}
+                          onChange={(e) => {
+                            const tasks = formData.service_tasks || [];
+                            if (e.target.checked) {
+                              handleInputChange('service_tasks', [...tasks, task.id]);
+                            } else {
+                              handleInputChange(
+                                'service_tasks',
+                                tasks.filter((id) => id !== task.id)
+                              );
+                            }
+                          }}
+                          className="h-4 w-4 text-primary-600 focus:ring-primary-500 border-secondary-300 rounded"
+                        />
+                        <span className="text-sm text-secondary-700">{task.name}</span>
+                      </label>
+                    ))}
+                  </div>
                 </div>
-              )}
 
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  <Briefcase className="w-4 h-4 inline-block mr-1" />
-                  Limpador
-                </label>
-                <select
-                  value={formData.cleaner_id || ''}
-                  onChange={(e) =>
-                    setFormData({ ...formData, cleaner_id: e.target.value })
-                  }
-                  className={`block w-full rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 sm:text-sm ${
-                    errors.cleaner ? 'border-red-300' : 'border-gray-300'
-                  }`}
-                >
-                  <option value="">Selecione um limpador</option>
-                  {cleaners.map((cleaner) => (
-                    <option key={cleaner.id} value={cleaner.id}>
-                      {cleaner.name}
-                    </option>
-                  ))}
-                </select>
-                {errors.cleaner && (
-                  <p className="mt-1 text-sm text-red-600">{errors.cleaner}</p>
-                )}
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  <Calendar className="w-4 h-4 inline-block mr-1" />
-                  Data e Hora
-                </label>
-                <input
-                  type="datetime-local"
-                  value={format(new Date(formData.scheduled_at || ''), "yyyy-MM-dd'T'HH:mm")}
-                  onChange={(e) =>
-                    setFormData({
-                      ...formData,
-                      scheduled_at: new Date(e.target.value).toISOString(),
-                    })
-                  }
-                  className={`block w-full rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 sm:text-sm ${
-                    errors.scheduled_at ? 'border-red-300' : 'border-gray-300'
-                  }`}
-                />
-                {errors.scheduled_at && (
-                  <p className="mt-1 text-sm text-red-600">{errors.scheduled_at}</p>
-                )}
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  <Briefcase className="w-4 h-4 inline-block mr-1" />
-                  Tipo de Serviço
-                </label>
-                <select
-                  value={selectedServiceType || ''}
-                  onChange={(e) => setSelectedServiceType(e.target.value)}
-                  className="block w-full rounded-md border-gray-300 shadow-sm focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
-                >
-                  <option value="">Selecione um tipo de serviço</option>
-                  {serviceTypes.map((service) => (
-                    <option key={service.id} value={service.id}>
-                      {service.name} - {service.description}
-                    </option>
-                  ))}
-                </select>
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  <CheckSquare className="w-4 h-4 inline-block mr-1" />
-                  Tarefas Adicionais
-                </label>
-                <div className="grid grid-cols-2 gap-4">
-                  {serviceTasks.map((task) => (
-                    <label key={task.id} className="flex items-start space-x-2">
-                      <input
-                        type="checkbox"
-                        checked={selectedTasks.includes(task.id)}
-                        onChange={(e) => {
-                          if (e.target.checked) {
-                            setSelectedTasks([...selectedTasks, task.id]);
-                          } else {
-                            setSelectedTasks(selectedTasks.filter(id => id !== task.id));
-                          }
-                        }}
-                        className="mt-1 h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
-                      />
-                      <div>
-                        <span className="text-sm font-medium text-gray-700">{task.name}</span>
-                        <p className="text-xs text-gray-500">{task.description}</p>
-                      </div>
-                    </label>
-                  ))}
+                <div className="col-span-2">
+                  <label className="block text-sm font-medium text-secondary-700 mb-1">
+                    <FileText className="w-4 h-4 inline-block mr-1" />
+                    Observações
+                  </label>
+                  <textarea
+                    value={formData.notes || ''}
+                    onChange={(e) => handleInputChange('notes', e.target.value)}
+                    className={inputStyles.base}
+                    rows={3}
+                  />
                 </div>
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  <FileText className="w-4 h-4 inline-block mr-1" />
-                  Observações Adicionais
-                </label>
-                <textarea
-                  value={additionalNotes}
-                  onChange={(e) => setAdditionalNotes(e.target.value)}
-                  rows={3}
-                  className="block w-full rounded-md border-gray-300 shadow-sm focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
-                  placeholder="Instruções especiais ou observações..."
-                />
               </div>
             </div>
 
-            <div className="flex justify-end space-x-3 pt-4">
+            <div className={modalStyles.footer}>
               <button
                 type="button"
                 onClick={onClose}
-                className="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md shadow-sm hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
+                className={createComponentStyle(buttonStyles, 'secondary')}
               >
                 Cancelar
               </button>
               <button
                 type="submit"
-                disabled={loading}
-                className="px-4 py-2 text-sm font-medium text-white bg-blue-600 border border-transparent rounded-md shadow-sm hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 disabled:opacity-50"
+                className={createComponentStyle(buttonStyles, 'primary')}
               >
-                {loading ? 'Salvando...' : appointment ? 'Salvar Alterações' : 'Criar Agendamento'}
+                {appointment ? 'Salvar Alterações' : 'Criar Agendamento'}
               </button>
             </div>
           </form>

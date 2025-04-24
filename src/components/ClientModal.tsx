@@ -3,6 +3,8 @@ import { Dialog, Tab } from '@headlessui/react';
 import { Client, ServiceLocation } from '../types';
 import { XMarkIcon } from '@heroicons/react/24/outline';
 import { AddressInput } from './AddressInput';
+import { modalStyles, inputStyles, buttonStyles } from '../styles/components';
+import { createComponentStyle } from '../utils/styles';
 
 interface ClientModalProps {
   isOpen: boolean;
@@ -190,64 +192,64 @@ const ClientModal: React.FC<ClientModalProps> = ({ isOpen, onClose, client, onSa
 
   return (
     <Dialog open={isOpen} onClose={onClose} className="relative z-50">
-      <div className="fixed inset-0 bg-black/30" aria-hidden="true" />
-      <div className="fixed inset-0 flex items-center justify-center p-4">
-        <Dialog.Panel className="mx-auto max-w-3xl w-full rounded-xl bg-white shadow-lg">
-          <div className="flex items-center justify-between p-6 border-b">
-            <Dialog.Title className="text-xl font-semibold">
+      <div className={modalStyles.overlay} aria-hidden="true" />
+      <div className={modalStyles.container}>
+        <Dialog.Panel className={`${modalStyles.content} max-h-[90vh] flex flex-col`}>
+          <div className={modalStyles.header}>
+            <Dialog.Title className={modalStyles.title}>
               {client ? 'Editar Cliente' : 'Novo Cliente'}
             </Dialog.Title>
             <button
               onClick={onClose}
-              className="rounded-lg p-2 hover:bg-gray-100"
+              className="text-secondary-400 hover:text-secondary-500"
             >
-              <XMarkIcon className="h-6 w-6" />
+              <XMarkIcon className="h-5 w-5" />
             </button>
           </div>
 
-          <form onSubmit={handleSubmit} className="p-6 space-y-6">
-            <Tab.Group>
-              <Tab.List className="flex space-x-1 rounded-xl bg-gray-100 p-1">
-                <Tab
-                  className={({ selected }) =>
-                    `w-full rounded-lg py-2.5 text-sm font-medium leading-5
-                    ${selected
-                      ? 'bg-white text-blue-700 shadow'
-                      : 'text-gray-700 hover:bg-white/[0.12] hover:text-blue-600'
-                    }`
-                  }
-                >
-                  Dados Pessoais
-                </Tab>
-                <Tab
-                  className={({ selected }) =>
-                    `w-full rounded-lg py-2.5 text-sm font-medium leading-5
-                    ${selected
-                      ? 'bg-white text-blue-700 shadow'
-                      : 'text-gray-700 hover:bg-white/[0.12] hover:text-blue-600'
-                    }`
-                  }
-                >
-                  Endereço
-                </Tab>
-                <Tab
-                  className={({ selected }) =>
-                    `w-full rounded-lg py-2.5 text-sm font-medium leading-5
-                    ${selected
-                      ? 'bg-white text-blue-700 shadow'
-                      : 'text-gray-700 hover:bg-white/[0.12] hover:text-blue-600'
-                    }`
-                  }
-                >
-                  Informações da Piscina
-                </Tab>
-              </Tab.List>
+          <form onSubmit={handleSubmit} className="flex-1 overflow-y-auto">
+            <div className="p-6 space-y-4">
+              <Tab.Group>
+                <Tab.List className="flex space-x-1 rounded-xl bg-secondary-100 p-1">
+                  <Tab
+                    className={({ selected }) =>
+                      `w-full rounded-lg py-2 text-sm font-medium leading-5
+                      ${selected
+                        ? 'bg-white text-primary-600 shadow'
+                        : 'text-secondary-600 hover:bg-white/[0.12] hover:text-primary-500'
+                      }`
+                    }
+                  >
+                    Dados Pessoais
+                  </Tab>
+                  <Tab
+                    className={({ selected }) =>
+                      `w-full rounded-lg py-2 text-sm font-medium leading-5
+                      ${selected
+                        ? 'bg-white text-primary-600 shadow'
+                        : 'text-secondary-600 hover:bg-white/[0.12] hover:text-primary-500'
+                      }`
+                    }
+                  >
+                    Endereço
+                  </Tab>
+                  <Tab
+                    className={({ selected }) =>
+                      `w-full rounded-lg py-2 text-sm font-medium leading-5
+                      ${selected
+                        ? 'bg-white text-primary-600 shadow'
+                        : 'text-secondary-600 hover:bg-white/[0.12] hover:text-primary-500'
+                      }`
+                    }
+                  >
+                    Informações da Piscina
+                  </Tab>
+                </Tab.List>
 
-              <Tab.Panels className="mt-6">
-                <Tab.Panel className="space-y-4">
-                  <div className="grid grid-cols-2 gap-4">
+                <Tab.Panels className="mt-4">
+                  <Tab.Panel className="grid grid-cols-2 gap-4">
                     <div>
-                      <label className="block text-sm font-medium text-gray-700">
+                      <label className="block text-sm font-medium text-secondary-700">
                         Nome
                       </label>
                       <input
@@ -255,13 +257,13 @@ const ClientModal: React.FC<ClientModalProps> = ({ isOpen, onClose, client, onSa
                         name="name"
                         value={formData.name}
                         onChange={handleInputChange}
-                        className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 shadow-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
+                        className={inputStyles.base}
                         required
                       />
                     </div>
 
                     <div>
-                      <label className="block text-sm font-medium text-gray-700">
+                      <label className="block text-sm font-medium text-secondary-700">
                         Email
                       </label>
                       <input
@@ -269,13 +271,13 @@ const ClientModal: React.FC<ClientModalProps> = ({ isOpen, onClose, client, onSa
                         name="email"
                         value={formData.email}
                         onChange={handleInputChange}
-                        className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 shadow-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
+                        className={inputStyles.base}
                         required
                       />
                     </div>
 
                     <div>
-                      <label className="block text-sm font-medium text-gray-700">
+                      <label className="block text-sm font-medium text-secondary-700">
                         Telefone
                       </label>
                       <input
@@ -283,20 +285,20 @@ const ClientModal: React.FC<ClientModalProps> = ({ isOpen, onClose, client, onSa
                         name="telefone"
                         value={formData.telefone}
                         onChange={handleInputChange}
-                        className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 shadow-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
+                        className={inputStyles.base}
                         required
                       />
                     </div>
 
                     <div>
-                      <label className="block text-sm font-medium text-gray-700">
+                      <label className="block text-sm font-medium text-secondary-700">
                         Frequência de Limpeza
                       </label>
                       <select
                         name="frequencia_limpeza"
                         value={formData.frequencia_limpeza}
                         onChange={handleInputChange}
-                        className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 shadow-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
+                        className={inputStyles.base}
                         required
                       >
                         <option value="">Selecione...</option>
@@ -307,185 +309,128 @@ const ClientModal: React.FC<ClientModalProps> = ({ isOpen, onClose, client, onSa
                     </div>
 
                     <div>
-                      <label className="block text-sm font-medium text-gray-700">
+                      <label className="block text-sm font-medium text-secondary-700">
                         Como Conheceu
                       </label>
                       <select
                         name="como_conheceu"
                         value={formData.como_conheceu}
                         onChange={handleInputChange}
-                        className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 shadow-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
-                        required
+                        className={inputStyles.base}
                       >
                         <option value="">Selecione...</option>
-                        <option value="indicacao">Indicação</option>
                         <option value="google">Google</option>
                         <option value="instagram">Instagram</option>
                         <option value="facebook">Facebook</option>
+                        <option value="indicacao">Indicação</option>
                         <option value="outros">Outros</option>
                       </select>
                     </div>
-                  </div>
-                </Tab.Panel>
+                  </Tab.Panel>
 
-                <Tab.Panel className="space-y-4">
-                  <AddressInput
-                    value={{
-                      street: serviceLocation.street,
-                      street_number: serviceLocation.street_number,
-                      neighborhood: serviceLocation.neighborhood,
-                      city: serviceLocation.city,
-                      state: serviceLocation.state,
-                      postal_code: serviceLocation.postal_code,
-                      latitude: serviceLocation.latitude,
-                      longitude: serviceLocation.longitude,
-                    }}
-                    onChange={(address) => {
-                      setServiceLocation(prevState => ({
-                        ...prevState,
-                        street: address.street,
-                        street_number: address.street_number,
-                        neighborhood: address.neighborhood,
-                        city: address.city,
-                        state: address.state,
-                        postal_code: address.postal_code,
-                        latitude: address.latitude,
-                        longitude: address.longitude,
-                        address_validated: true,
-                      }));
-                    }}
-                    onValidate={(isValid) => {
-                      setServiceLocation(prevState => ({
-                        ...prevState,
-                        address_validated: isValid,
-                      }));
-                    }}
-                  />
+                  <Tab.Panel className="space-y-4">
+                    <AddressInput
+                      value={{
+                        street: serviceLocation.street,
+                        street_number: serviceLocation.street_number,
+                        neighborhood: serviceLocation.neighborhood,
+                        city: serviceLocation.city,
+                        state: serviceLocation.state,
+                        postal_code: serviceLocation.postal_code,
+                        latitude: serviceLocation.latitude,
+                        longitude: serviceLocation.longitude,
+                      }}
+                      onChange={(address) => {
+                        setServiceLocation(prevState => ({
+                          ...prevState,
+                          street: address.street,
+                          street_number: address.street_number,
+                          neighborhood: address.neighborhood,
+                          city: address.city,
+                          state: address.state,
+                          postal_code: address.postal_code,
+                          latitude: address.latitude,
+                          longitude: address.longitude,
+                          address_validated: true,
+                        }));
+                      }}
+                      onValidate={(isValid) => {
+                        setServiceLocation(prevState => ({
+                          ...prevState,
+                          address_validated: isValid,
+                        }));
+                      }}
+                    />
+                  </Tab.Panel>
 
-                  <div className="grid grid-cols-2 gap-4">
+                  <Tab.Panel className="grid grid-cols-2 gap-4">
                     <div>
-                      <label className="block text-sm font-medium text-gray-700">
-                        Complemento
-                      </label>
-                      <input
-                        type="text"
-                        name="complemento"
-                        value={serviceLocation.complemento}
-                        onChange={handleServiceLocationChange}
-                        className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 shadow-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
-                      />
-                    </div>
-
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700">
-                        Ponto de Referência
-                      </label>
-                      <input
-                        type="text"
-                        name="ponto_referencia"
-                        value={serviceLocation.ponto_referencia}
-                        onChange={handleServiceLocationChange}
-                        className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 shadow-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
-                      />
-                    </div>
-
-                    <div className="col-span-2">
-                      <label className="block text-sm font-medium text-gray-700">
-                        Instruções de Acesso
-                      </label>
-                      <textarea
-                        name="instrucoes_acesso"
-                        value={serviceLocation.instrucoes_acesso}
-                        onChange={handleServiceLocationChange}
-                        rows={3}
-                        className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 shadow-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
-                      />
-                    </div>
-                  </div>
-                </Tab.Panel>
-
-                <Tab.Panel className="space-y-4">
-                  <div className="grid grid-cols-2 gap-4">
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700">
+                      <label className="block text-sm font-medium text-secondary-700">
                         Tipo de Piscina
                       </label>
-                      <select
+                      <input
+                        type="text"
                         name="tipo_piscina"
                         value={serviceLocation.tipo_piscina}
                         onChange={handleServiceLocationChange}
-                        className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 shadow-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
-                      >
-                        <option value="">Selecione...</option>
-                        <option value="fibra">Fibra</option>
-                        <option value="vinil">Vinil</option>
-                        <option value="alvenaria">Alvenaria</option>
-                        <option value="outros">Outros</option>
-                      </select>
+                        className={inputStyles.base}
+                      />
                     </div>
 
                     <div>
-                      <label className="block text-sm font-medium text-gray-700">
+                      <label className="block text-sm font-medium text-secondary-700">
                         Tamanho da Piscina
                       </label>
-                      <select
+                      <input
+                        type="text"
                         name="tamanho_piscina"
                         value={serviceLocation.tamanho_piscina}
                         onChange={handleServiceLocationChange}
-                        className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 shadow-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
-                      >
-                        <option value="">Selecione...</option>
-                        <option value="pequena">Pequena (até 30m²)</option>
-                        <option value="media">Média (30m² - 50m²)</option>
-                        <option value="grande">Grande (mais de 50m²)</option>
-                      </select>
-                    </div>
-
-                    <div className="col-span-2">
-                      <label className="block text-sm font-medium text-gray-700">
-                        Produtos Utilizados
-                      </label>
-                      <textarea
-                        name="produtos_utilizados"
-                        value={serviceLocation.produtos_utilizados}
-                        onChange={handleServiceLocationChange}
-                        rows={3}
-                        className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 shadow-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
-                      />
-                    </div>
-
-                    <div className="col-span-2">
-                      <label className="block text-sm font-medium text-gray-700">
-                        Equipamentos
-                      </label>
-                      <textarea
-                        name="equipamentos"
-                        value={serviceLocation.equipamentos}
-                        onChange={handleServiceLocationChange}
-                        rows={3}
-                        className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 shadow-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
+                        className={inputStyles.base}
                       />
                     </div>
 
                     <div>
-                      <label className="block text-sm font-medium text-gray-700">
+                      <label className="block text-sm font-medium text-secondary-700">
+                        Produtos Utilizados
+                      </label>
+                      <input
+                        type="text"
+                        name="produtos_utilizados"
+                        value={serviceLocation.produtos_utilizados}
+                        onChange={handleServiceLocationChange}
+                        className={inputStyles.base}
+                      />
+                    </div>
+
+                    <div>
+                      <label className="block text-sm font-medium text-secondary-700">
+                        Equipamentos
+                      </label>
+                      <input
+                        type="text"
+                        name="equipamentos"
+                        value={serviceLocation.equipamentos}
+                        onChange={handleServiceLocationChange}
+                        className={inputStyles.base}
+                      />
+                    </div>
+
+                    <div>
+                      <label className="block text-sm font-medium text-secondary-700">
                         Horário Preferido
                       </label>
-                      <select
+                      <input
+                        type="text"
                         name="horario_preferido"
                         value={serviceLocation.horario_preferido}
                         onChange={handleServiceLocationChange}
-                        className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 shadow-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
-                      >
-                        <option value="">Selecione...</option>
-                        <option value="manha">Manhã (8h - 12h)</option>
-                        <option value="tarde">Tarde (13h - 17h)</option>
-                        <option value="noite">Noite (18h - 22h)</option>
-                      </select>
+                        className={inputStyles.base}
+                      />
                     </div>
 
                     <div className="col-span-2">
-                      <label className="block text-sm font-medium text-gray-700">
+                      <label className="block text-sm font-medium text-secondary-700">
                         Observações
                       </label>
                       <textarea
@@ -493,27 +438,27 @@ const ClientModal: React.FC<ClientModalProps> = ({ isOpen, onClose, client, onSa
                         value={serviceLocation.observacoes}
                         onChange={handleServiceLocationChange}
                         rows={3}
-                        className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 shadow-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
+                        className={inputStyles.base}
                       />
                     </div>
-                  </div>
-                </Tab.Panel>
-              </Tab.Panels>
-            </Tab.Group>
+                  </Tab.Panel>
+                </Tab.Panels>
+              </Tab.Group>
+            </div>
 
-            <div className="mt-6 flex justify-end space-x-3">
+            <div className={modalStyles.footer}>
               <button
                 type="button"
                 onClick={onClose}
-                className="rounded-lg border border-gray-300 px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50"
+                className={createComponentStyle(buttonStyles, 'secondary')}
               >
                 Cancelar
               </button>
               <button
                 type="submit"
-                className="rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700"
+                className={createComponentStyle(buttonStyles, 'primary')}
               >
-                {client ? 'Salvar' : 'Criar'}
+                {client ? 'Salvar Alterações' : 'Criar Cliente'}
               </button>
             </div>
           </form>
