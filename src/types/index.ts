@@ -6,9 +6,11 @@ export type ServiceLocation = {
   neighborhood: string;
   city: string;
   state: string;
+  zip_code: string;
   latitude: number;
   longitude: number;
   is_primary: boolean;
+  created_at: string;
 };
 
 export type UserRole = 'admin' | 'manager' | 'cleaner';
@@ -17,78 +19,40 @@ export type DashboardUser = {
   id: string;
   email: string;
   role: UserRole;
-  active: boolean;
+  name: string;
   created_at: string;
-  updated_at: string;
 };
 
 export type Cleaner = {
   id: string;
   name: string;
   email: string;
-  personal_phone: string | null;
-  company_phone: string | null;
-  active: boolean;
+  phone: string;
   created_at: string;
-  password?: string;
-  available_days: string[];
-  work_start_time: string | null;
-  work_end_time: string | null;
-  service_areas: string[];
-  has_vehicle: boolean;
-  vehicle_type: string | null;
-  address: string | null;
-  emergency_contact_name: string | null;
-  emergency_contact_phone: string | null;
-  employee_code: string | null;
-  hire_date: string | null;
-  role: UserRole;
+  active: boolean;
 };
 
-export type AppointmentStatus = 'scheduled' | 'in_progress' | 'completed';
+export type AppointmentStatus = 'scheduled' | 'in_progress' | 'completed' | 'cancelled';
 
-export type CleaningServiceType = 'weekly' | 'bi_weekly' | 'monthly' | 'one_time';
+export type ServiceFrequency = 'weekly' | 'bi_weekly' | 'monthly' | 'one_time';
 
-export type CleaningTask = {
+export type ServiceType = {
   id: string;
   name: string;
   description: string;
   duration_minutes: number;
-};
-
-export type CleaningTasks = {
-  skimming: boolean;
-  vacuuming: boolean;
-  brushing: boolean;
-  basket_empty: boolean;
-  water_chemistry: boolean;
-  filter_backwash: boolean;
-  algae_treatment: boolean;
-  shock_treatment: boolean;
-  tile_cleaning: boolean;
-  acid_wash: boolean;
-  pool_opening: boolean;
-  pool_closing: boolean;
-};
-
-export type Appointment = {
-  id: string;
-  client_id: string;
-  client_name: string;
-  address: string;
-  cleaner_id: string;
-  status: AppointmentStatus;
-  scheduled_at: string;
-  started_at: string | null;
-  completed_at: string | null;
-  description: string | null;
-  latitude: number | null;
-  longitude: number | null;
+  price: number;
+  frequency: ServiceFrequency;
   created_at: string;
-  service_type: CleaningServiceType;
-  cleaning_tasks: CleaningTasks;
-  estimated_duration: number;
-  special_instructions: string | null;
+};
+
+export type ServiceTask = {
+  id: string;
+  name: string;
+  description: string;
+  duration_minutes: number;
+  price: number;
+  created_at: string;
 };
 
 export type Client = {
@@ -96,26 +60,26 @@ export type Client = {
   name: string;
   email: string;
   phone: string;
-  address: string;
-  active: boolean;
   created_at: string;
-  complemento?: string;
-  ponto_referencia?: string;
-  instrucoes_acesso?: string;
-  tipo_piscina?: string;
-  tamanho_piscina?: string;
-  produtos_utilizados?: string;
-  equipamentos?: string;
-  horario_preferido?: string;
-  observacoes?: string;
-  como_conheceu?: string;
-  address_validated: boolean;
-  street?: string;
-  street_number?: string;
-  neighborhood?: string;
-  city?: string;
-  state?: string;
-  postal_code?: string;
-  latitude?: number;
-  longitude?: number;
+  active: boolean;
+};
+
+export type Appointment = {
+  id: string;
+  client_id: string;
+  cleaner_id: string;
+  service_location_id: string;
+  scheduled_at: string;
+  status: AppointmentStatus;
+  description: string;
+  service_type_id: string | null;
+  service_tasks: string[];
+  additional_notes: string | null;
+  frequency: ServiceFrequency | null;
+  created_at: string;
+  updated_at: string;
+  client?: Client;
+  cleaner?: Cleaner;
+  service_location?: ServiceLocation;
+  service_type?: ServiceType;
 };

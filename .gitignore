@@ -63,12 +63,3 @@ out/
 **/public/sw.js.map
 **/public/workbox-*.js.map
 **/public/worker-*.js.map
-
-# misc
-*.pem
-
-# local env files
-.env*.local
-
-# typescript
-next-env.d.ts
