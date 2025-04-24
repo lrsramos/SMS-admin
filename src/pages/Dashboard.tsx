@@ -1,6 +1,6 @@
 import React from 'react';
 import { useQuery } from '@tanstack/react-query';
-import { format, startOfToday, endOfToday, isToday } from 'date-fns';
+import { format, startOfToday, endOfToday, isToday, parseISO, startOfDay, endOfDay } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { 
   Calendar, 
@@ -14,32 +14,59 @@ import {
 } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
-import { Appointment, Cleaner } from '../types';
+import type { Appointment, Cleaner, Client, ServiceLocation } from '../types/models';
+
+interface AppointmentWithRelations extends Appointment {
+  cleaners: Cleaner;
+  clients: Client;
+  service_locations: ServiceLocation;
+}
 
 const Dashboard = () => {
-  const { data: todayAppointments, isLoading: isLoadingToday } = useQuery({
-    queryKey: ['appointments', 'today'],
+  const { data: allAppointments, isLoading: isLoadingAppointments } = useQuery({
+    queryKey: ['appointments', 'all'],
     queryFn: async () => {
-      const start = startOfToday();
-      const end = endOfToday();
-      
-      const { data, error } = await supabase
+      // First, fetch appointments
+      const { data: appointmentsData, error: appointmentsError } = await supabase
         .from('appointments')
-        .select(`
-          *,
-          cleaners (
-            name,
-            email,
-            personal_phone,
-            company_phone
-          )
-        `)
-        .gte('scheduled_at', start.toISOString())
-        .lte('scheduled_at', end.toISOString())
-        .order('scheduled_at');
+        .select('*')
+        .order('scheduled_at', { ascending: true });
       
-      if (error) throw error;
-      return data as (Appointment & { cleaners: Cleaner })[];
+      if (appointmentsError) throw appointmentsError;
+
+      if (appointmentsData && appointmentsData.length > 0) {
+        // Get unique IDs for related data
+        const clientIds = [...new Set(appointmentsData.map(a => a.client_id))];
+        const cleanerIds = [...new Set(appointmentsData.map(a => a.cleaner_id))];
+        const locationIds = [...new Set(appointmentsData.map(a => a.service_location_id))];
+
+        // Fetch related data in parallel
+        const [
+          { data: clientsData, error: clientsError },
+          { data: cleanersData, error: cleanersError },
+          { data: locationsData, error: locationsError }
+        ] = await Promise.all([
+          supabase.from('clients').select('*').in('id', clientIds),
+          supabase.from('cleaners').select('*').in('id', cleanerIds),
+          supabase.from('service_locations').select('*').in('id', locationIds)
+        ]);
+
+        if (clientsError) throw clientsError;
+        if (cleanersError) throw cleanersError;
+        if (locationsError) throw locationsError;
+
+        // Combine the data
+        const enrichedAppointments = appointmentsData.map(appointment => ({
+          ...appointment,
+          client: clientsData?.find(c => c.id === appointment.client_id),
+          cleaner: cleanersData?.find(c => c.id === appointment.cleaner_id),
+          service_location: locationsData?.find(l => l.id === appointment.service_location_id)
+        }));
+
+        return enrichedAppointments as unknown as AppointmentWithRelations[];
+      }
+
+      return [] as AppointmentWithRelations[];
     },
   });
 
@@ -82,7 +109,60 @@ const Dashboard = () => {
     },
   });
 
-  if (isLoadingToday || isLoadingCleaners) {
+  // Group appointments by date
+  const groupedAppointments = React.useMemo(() => {
+    if (!allAppointments) return {};
+    
+    return allAppointments.reduce((acc, appointment) => {
+      const date = format(parseISO(appointment.scheduled_at), 'yyyy-MM-dd');
+      if (!acc[date]) {
+        acc[date] = [];
+      }
+      acc[date].push(appointment);
+      return acc;
+    }, {} as Record<string, AppointmentWithRelations[]>);
+  }, [allAppointments]);
+
+  // Sort dates in ascending order
+  const sortedDates = React.useMemo(() => {
+    return Object.keys(groupedAppointments).sort();
+  }, [groupedAppointments]);
+
+  // Format address
+  const formatAddress = (location: ServiceLocation) => {
+    if (!location) return '';
+    return `${location.street}, ${location.street_number} - ${location.neighborhood}, ${location.city}/${location.state}`;
+  };
+
+  // Format status
+  const getStatusText = (status: string) => {
+    switch (status) {
+      case 'scheduled':
+        return 'Agendado';
+      case 'in_progress':
+        return 'Em Andamento';
+      case 'completed':
+        return 'Concluído';
+      default:
+        return status;
+    }
+  };
+
+  // Get status color
+  const getStatusColor = (status: string) => {
+    switch (status) {
+      case 'scheduled':
+        return 'bg-blue-100 text-blue-800';
+      case 'in_progress':
+        return 'bg-yellow-100 text-yellow-800';
+      case 'completed':
+        return 'bg-green-100 text-green-800';
+      default:
+        return 'bg-gray-100 text-gray-800';
+    }
+  };
+
+  if (isLoadingAppointments || isLoadingCleaners) {
     return (
       <div className="flex items-center justify-center h-64">
         <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
@@ -143,11 +223,11 @@ const Dashboard = () => {
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        {/* Today's Appointments */}
+        {/* All Appointments */}
         <div className="bg-white rounded-lg shadow">
           <div className="p-6 border-b border-gray-200">
             <div className="flex items-center justify-between">
-              <h2 className="text-lg font-medium text-gray-900">Agendamentos de Hoje</h2>
+              <h2 className="text-lg font-medium text-gray-900">Agendamentos</h2>
               <Link 
                 to="/appointments" 
                 className="text-sm text-blue-600 hover:text-blue-800 flex items-center"
@@ -158,43 +238,54 @@ const Dashboard = () => {
             </div>
           </div>
           <div className="divide-y divide-gray-200">
-            {todayAppointments?.length === 0 ? (
+            {sortedDates.length === 0 ? (
               <div className="p-6 text-center text-gray-500">
-                Nenhum agendamento para hoje
+                Nenhum agendamento encontrado
               </div>
             ) : (
-              todayAppointments?.map((appointment) => (
-                <div key={appointment.id} className="p-6 hover:bg-gray-50">
-                  <div className="flex items-start justify-between">
-                    <div className="min-w-0 flex-1">
-                      <div className="flex items-center space-x-3">
-                        <p className="text-sm font-medium text-gray-900 truncate">
-                          {appointment.client_name}
-                        </p>
-                        <span
-                          className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${
-                            appointment.status === 'completed'
-                              ? 'bg-green-100 text-green-800'
-                              : appointment.status === 'in_progress'
-                              ? 'bg-yellow-100 text-yellow-800'
-                              : 'bg-blue-100 text-blue-800'
-                          }`}
-                        >
-                          {appointment.status === 'completed'
-                            ? 'Concluído'
-                            : appointment.status === 'in_progress'
-                            ? 'Em Andamento'
-                            : 'Agendado'}
-                        </span>
+              sortedDates.map((date) => (
+                <div key={date} className="p-6">
+                  <h3 className="text-sm font-medium text-gray-900 mb-4">
+                    {format(parseISO(date), "EEEE, dd 'de' MMMM", { locale: ptBR })}
+                  </h3>
+                  <div className="space-y-4">
+                    {groupedAppointments[date].map((appointment) => (
+                      <div key={appointment.id} className="hover:bg-gray-50 p-4 rounded-lg">
+                        <div className="flex items-start justify-between">
+                          <div className="min-w-0 flex-1">
+                            <div className="flex items-center space-x-3">
+                              <p className="text-sm font-medium text-gray-900 truncate">
+                                {appointment.client?.name}
+                              </p>
+                              <span
+                                className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${getStatusColor(appointment.status)}`}
+                              >
+                                {getStatusText(appointment.status)}
+                              </span>
+                            </div>
+                            <div className="mt-1 flex items-center space-x-2 text-sm text-gray-500">
+                              <Clock className="h-4 w-4" />
+                              <p>{format(parseISO(appointment.scheduled_at), 'HH:mm')}</p>
+                              <span>&middot;</span>
+                              <MapPin className="h-4 w-4" />
+                              <p className="truncate">
+                                {appointment.service_location ? formatAddress(appointment.service_location) : 'Endereço não disponível'}
+                              </p>
+                            </div>
+                            <div className="mt-1 flex items-center space-x-2 text-sm text-gray-500">
+                              <Users className="h-4 w-4" />
+                              <p>{appointment.cleaner?.name}</p>
+                              {appointment.description && (
+                                <>
+                                  <span>&middot;</span>
+                                  <p className="truncate">{appointment.description}</p>
+                                </>
+                              )}
+                            </div>
+                          </div>
+                        </div>
                       </div>
-                      <div className="mt-1 flex items-center space-x-2 text-sm text-gray-500">
-                        <Clock className="h-4 w-4" />
-                        <p>{format(new Date(appointment.scheduled_at), 'HH:mm')}</p>
-                        <span>&middot;</span>
-                        <MapPin className="h-4 w-4" />
-                        <p className="truncate">{appointment.address}</p>
-                      </div>
-                    </div>
+                    ))}
                   </div>
                 </div>
               ))
@@ -218,7 +309,7 @@ const Dashboard = () => {
           </div>
           <div className="divide-y divide-gray-200">
             {activeCleaners?.map((cleaner) => {
-              const currentAppointment = todayAppointments?.find(
+              const currentAppointment = allAppointments?.find(
                 apt => apt.cleaner_id === cleaner.id && apt.status === 'in_progress'
               );
 
@@ -238,7 +329,7 @@ const Dashboard = () => {
                             <>
                               <Clock className="h-4 w-4 text-yellow-500" />
                               <p className="ml-1.5 text-sm text-gray-500">
-                                Em serviço: {currentAppointment.client_name}
+                                Em serviço: {currentAppointment.client?.name}
                               </p>
                             </>
                           ) : (
