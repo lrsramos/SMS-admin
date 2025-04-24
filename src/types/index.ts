@@ -1,28 +1,14 @@
 export type ServiceLocation = {
   id: string;
   client_id: string;
-  name: string;
+  street: string;
+  street_number: string;
+  neighborhood: string;
+  city: string;
+  state: string;
+  latitude: number;
+  longitude: number;
   is_primary: boolean;
-  street: string | null;
-  street_number: string | null;
-  neighborhood: string | null;
-  city: string | null;
-  state: string | null;
-  postal_code: string | null;
-  complemento: string | null;
-  ponto_referencia: string | null;
-  instrucoes_acesso: string | null;
-  latitude: number | null;
-  longitude: number | null;
-  address_validated: boolean;
-  tipo_piscina: string | null;
-  tamanho_piscina: string | null;
-  produtos_utilizados: string | null;
-  equipamentos: string | null;
-  horario_preferido: string | null;
-  observacoes: string | null;
-  created_at: string;
-  updated_at: string;
 };
 
 export type UserRole = 'admin' | 'manager' | 'cleaner';
@@ -61,8 +47,33 @@ export type Cleaner = {
 
 export type AppointmentStatus = 'scheduled' | 'in_progress' | 'completed';
 
+export type CleaningServiceType = 'weekly' | 'bi_weekly' | 'monthly' | 'one_time';
+
+export type CleaningTask = {
+  id: string;
+  name: string;
+  description: string;
+  duration_minutes: number;
+};
+
+export type CleaningTasks = {
+  skimming: boolean;
+  vacuuming: boolean;
+  brushing: boolean;
+  basket_empty: boolean;
+  water_chemistry: boolean;
+  filter_backwash: boolean;
+  algae_treatment: boolean;
+  shock_treatment: boolean;
+  tile_cleaning: boolean;
+  acid_wash: boolean;
+  pool_opening: boolean;
+  pool_closing: boolean;
+};
+
 export type Appointment = {
   id: string;
+  client_id: string;
   client_name: string;
   address: string;
   cleaner_id: string;
@@ -74,15 +85,37 @@ export type Appointment = {
   latitude: number | null;
   longitude: number | null;
   created_at: string;
+  service_type: CleaningServiceType;
+  cleaning_tasks: CleaningTasks;
+  estimated_duration: number;
+  special_instructions: string | null;
 };
 
 export type Client = {
   id: string;
   name: string;
-  email: string | null;
-  telefone: string | null;
-  frequencia_limpeza: string | null;
-  como_conheceu: string | null;
+  email: string;
+  phone: string;
+  address: string;
+  active: boolean;
   created_at: string;
-  service_locations?: ServiceLocation[];
+  complemento?: string;
+  ponto_referencia?: string;
+  instrucoes_acesso?: string;
+  tipo_piscina?: string;
+  tamanho_piscina?: string;
+  produtos_utilizados?: string;
+  equipamentos?: string;
+  horario_preferido?: string;
+  observacoes?: string;
+  como_conheceu?: string;
+  address_validated: boolean;
+  street?: string;
+  street_number?: string;
+  neighborhood?: string;
+  city?: string;
+  state?: string;
+  postal_code?: string;
+  latitude?: number;
+  longitude?: number;
 };
